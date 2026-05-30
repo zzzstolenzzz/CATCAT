@@ -42,7 +42,7 @@
       <div class="stat-card accent-green">
         <div class="stat-top">
           <span class="stat-icon">◎</span>
-          <span class="stat-label">Model Accuracy</span><span class="tip" data-tip="mAP50 — Mean Average Precision at 50% overlap threshold. 100% = perfect detection. 80%+ is considered strong for ship detection.">?</span>
+          <span class="stat-label">Model Accuracy</span><span class="tip" data-tip="mAP50 — Mean Average Precision at IoU 0.50. Measures how well the model detects ships. A predicted box must overlap the true box by at least 50% to count as correct. 100% = perfect. 80%+ is strong for ship detection.">?</span>
         </div>
         <div class="stat-number" id="stat-map">—</div>
         <div class="stat-sub">mAP50</div>
@@ -92,7 +92,7 @@
               <span class="engine-val" id="eng-epoch">—</span>
             </div>
             <div class="engine-row">
-              <span class="engine-key">Loss<span class="tip" data-tip="Training loss — measures how wrong the model's predictions are. Lower is better. Should decrease with each epoch.">?</span></span>
+              <span class="engine-key">Loss<span class="tip" data-tip="Combined training loss — a raw score (not a percent) measuring prediction error. Typical range is 1–5. Lower is better. Should trend downward across epochs.">?</span></span>
               <span class="engine-val" id="eng-loss">—</span>
             </div>
             <div class="engine-row">
@@ -165,6 +165,7 @@
     </div>
   </div>
 
+  <div id="global-tip"></div>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
   <script src="config.js?v=3"></script>
   <script src="dashboard.js?v=3"></script>

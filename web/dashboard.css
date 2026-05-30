@@ -300,42 +300,24 @@ header {
 }
 .tip:hover { background: rgba(0,204,255,0.2); border-color: rgba(0,204,255,0.4); color: var(--blue); }
 
-.tip::after {
-  content: attr(data-tip);
-  position: absolute;
-  bottom: calc(100% + 8px);
-  left: 50%;
-  transform: translateX(-50%);
+
+/* ── Global tooltip ─────────────────────────────────────────── */
+#global-tip {
+  position: fixed;
   background: #0d1f35;
-  border: 1px solid rgba(0,204,255,0.25);
-  color: rgba(255,255,255,0.85);
+  border: 1px solid rgba(0,204,255,0.3);
+  color: rgba(255,255,255,0.9);
   font-size: 0.72rem;
-  font-weight: 400;
-  line-height: 1.4;
-  padding: 7px 10px;
-  border-radius: 7px;
-  width: 200px;
+  line-height: 1.5;
+  padding: 8px 11px;
+  border-radius: 8px;
+  width: 210px;
   white-space: normal;
   pointer-events: none;
-  opacity: 0;
-  transition: opacity 0.15s;
-  z-index: 100;
-  box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+  box-shadow: 0 6px 24px rgba(0,0,0,0.6);
+  z-index: 9999;
+  display: none;
 }
-.tip::before {
-  content: '';
-  position: absolute;
-  bottom: calc(100% + 3px);
-  left: 50%;
-  transform: translateX(-50%);
-  border: 5px solid transparent;
-  border-top-color: rgba(0,204,255,0.25);
-  pointer-events: none;
-  opacity: 0;
-  transition: opacity 0.15s;
-  z-index: 101;
-}
-.tip:hover::after, .tip:hover::before { opacity: 1; }
 
 /* ── Responsive ──────────────────────────────────────────────── */
 @media (max-width: 900px) {

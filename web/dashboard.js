@@ -224,6 +224,23 @@ async function fetchHistory() {
   }
 }
 
+// ── Global tooltips ───────────────────────────────────────────────────────────
+const globalTip = document.getElementById('global-tip');
+
+document.querySelectorAll('.tip').forEach(el => {
+  el.addEventListener('mouseenter', () => {
+    const r = el.getBoundingClientRect();
+    globalTip.textContent = el.dataset.tip;
+    globalTip.style.display = 'block';
+    const tipW = 210;
+    let left = r.left + r.width / 2 - tipW / 2;
+    left = Math.max(8, Math.min(left, window.innerWidth - tipW - 8));
+    globalTip.style.left = left + 'px';
+    globalTip.style.top = (r.top - globalTip.offsetHeight - 10) + 'px';
+  });
+  el.addEventListener('mouseleave', () => { globalTip.style.display = 'none'; });
+});
+
 // ── Boot ──────────────────────────────────────────────────────────────────────
 
 fetchStats();
