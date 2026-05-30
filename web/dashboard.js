@@ -107,14 +107,24 @@ function updateEngine(stats) {
     ringStatus.textContent = 'TRAINING';
     const elapsed = stats.training_elapsed_s ?? 0;
     const mins = Math.floor(elapsed / 60), secs = elapsed % 60;
-    ringDetail.textContent = `${mins}m ${secs}s elapsed`;
-    ring.style.strokeDashoffset = circumference * 0.15;
+    const p = stats.training_progress ?? {};
+    const epoch = p.epoch ?? 0, epochs = p.epochs ?? 5;
+    const pct = epochs > 0 ? epoch / epochs : 0;
+    ring.style.strokeDashoffset = circumference * (1 - pct);
+    ringDetail.textContent = epoch > 0
+      ? `Epoch ${epoch}/${epochs} · ${mins}m ${secs}s`
+      : `Starting… ${mins}m ${secs}s`;
+
+    els('eng-epoch').textContent = epoch > 0 ? `${epoch} / ${epochs}` : 'Starting…';
+    els('eng-loss').textContent = p.loss != null ? p.loss.toFixed(4) : '—';
   } else {
     ring.classList.remove('training');
     ringStatus.classList.remove('training');
     ringStatus.textContent = 'IDLE';
     ringDetail.textContent = 'Ready';
     ring.style.strokeDashoffset = circumference;
+    els('eng-epoch').textContent = '—';
+    els('eng-loss').textContent = '—';
   }
 
   const every = stats.train_every ?? 5;

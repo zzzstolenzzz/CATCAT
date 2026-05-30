@@ -36,6 +36,7 @@ _annotation_count = 0
 _model_version = "initial"
 _training_run_count = 0
 _training_started_at = None
+_training_progress = {"epoch": 0, "epochs": 5, "loss": None, "map50": None}
 
 
 # ── State helpers ──────────────────────────────────────────────────────────────
@@ -158,6 +159,7 @@ async def stats():
         "images_in_queue": _images_in_queue(),
         "training": _is_training,
         "training_elapsed_s": elapsed,
+        "training_progress": _training_progress,
         "training_run_count": _training_run_count,
         "model_version": _model_version,
         "map50": _get_map50(),
@@ -176,7 +178,7 @@ async def history():
 # ── Background retraining ──────────────────────────────────────────────────────
 
 def _retrain():
-    global _is_training, _model_version
+    global _is_training, _model_version, _training_run_count, _training_started_at
     if not _lock.acquire(blocking=False):
         return
     _is_training = True
@@ -214,11 +216,23 @@ def _retrain():
         except Exception:
             weights = "yolov8n.pt"
 
-        # Train
+        # Train with epoch progress callbacks
+        EPOCHS = 5
+        _training_progress.update({"epoch": 0, "epochs": EPOCHS, "loss": None, "map50": None})
+
+        def on_epoch_end(trainer):
+            _training_progress.update({
+                "epoch": trainer.epoch + 1,
+                "epochs": trainer.epochs,
+                "loss": round(float(trainer.loss), 4) if trainer.loss is not None else None,
+                "map50": round(float(trainer.metrics.get("metrics/mAP50(B)", 0)), 4),
+            })
+
         model = YOLO(weights)
+        model.add_callback("on_train_epoch_end", on_epoch_end)
         model.train(
             data=str(tmpdir / "dataset.yaml"),
-            epochs=5, imgsz=640,
+            epochs=EPOCHS, imgsz=640,
             project=str(tmpdir), name="train", exist_ok=True,
         )
 
