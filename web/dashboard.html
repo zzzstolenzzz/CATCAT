@@ -24,7 +24,7 @@
       <div class="stat-card accent-blue">
         <div class="stat-top">
           <span class="stat-icon">◈</span>
-          <span class="stat-label">Total Annotations</span>
+          <span class="stat-label">Total Annotations</span><span class="tip" data-tip="Cumulative count of images annotated and submitted to the shared dataset by all users.">?</span>
         </div>
         <div class="stat-number" id="stat-annotations">—</div>
         <div class="stat-sub" id="stat-annotations-sub">loading…</div>
@@ -33,7 +33,7 @@
       <div class="stat-card accent-orange">
         <div class="stat-top">
           <span class="stat-icon">⬡</span>
-          <span class="stat-label">Images in Queue</span>
+          <span class="stat-label">Images in Queue</span><span class="tip" data-tip="Images submitted but not yet trained on. These are deleted automatically after each training run completes.">?</span>
         </div>
         <div class="stat-number" id="stat-queue">—</div>
         <div class="stat-sub" id="stat-queue-sub">awaiting training</div>
@@ -42,7 +42,7 @@
       <div class="stat-card accent-green">
         <div class="stat-top">
           <span class="stat-icon">◎</span>
-          <span class="stat-label">Model Accuracy</span>
+          <span class="stat-label">Model Accuracy</span><span class="tip" data-tip="mAP50 — Mean Average Precision at 50% overlap threshold. 100% = perfect detection. 80%+ is considered strong for ship detection.">?</span>
         </div>
         <div class="stat-number" id="stat-map">—</div>
         <div class="stat-sub">mAP50</div>
@@ -51,7 +51,7 @@
       <div class="stat-card accent-purple">
         <div class="stat-top">
           <span class="stat-icon">⬟</span>
-          <span class="stat-label">Training Runs</span>
+          <span class="stat-label">Training Runs</span><span class="tip" data-tip="Number of completed retraining cycles. Each run fine-tunes the model on the latest batch of annotations.">?</span>
         </div>
         <div class="stat-number" id="stat-runs">—</div>
         <div class="stat-sub" id="stat-runs-sub">completed cycles</div>
@@ -88,15 +88,15 @@
           </div>
           <div class="engine-stats">
             <div class="engine-row">
-              <span class="engine-key">Epoch</span>
+              <span class="engine-key">Epoch<span class="tip" data-tip="Current training epoch out of total. Each epoch is one full pass through the queued images.">?</span></span>
               <span class="engine-val" id="eng-epoch">—</span>
             </div>
             <div class="engine-row">
-              <span class="engine-key">Loss</span>
+              <span class="engine-key">Loss<span class="tip" data-tip="Training loss — measures how wrong the model's predictions are. Lower is better. Should decrease with each epoch.">?</span></span>
               <span class="engine-val" id="eng-loss">—</span>
             </div>
             <div class="engine-row">
-              <span class="engine-key">Next train at</span>
+              <span class="engine-key">Next train at<span class="tip" data-tip="Images currently in queue vs. the threshold needed to trigger the next training run.">?</span></span>
               <span class="engine-val" id="eng-next">—</span>
             </div>
             <div class="engine-row">
@@ -104,7 +104,7 @@
               <span class="engine-val" id="eng-every">—</span>
             </div>
             <div class="engine-row">
-              <span class="engine-key">Model version</span>
+              <span class="engine-key">Model version<span class="tip" data-tip="Increments with each completed training run. All annotators automatically load the latest version.">?</span></span>
               <span class="engine-val" id="eng-version">—</span>
             </div>
             <div class="engine-row">
