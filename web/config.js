@@ -4,7 +4,7 @@
 window.CATCAT_CONFIG = {
   modelUrl: 'https://huggingface.co/davemost/catcat-model/resolve/main/model.onnx',
   backendUrl: 'https://davemost-catcat-backend.hf.space',
-  confThreshold: 0.25,
+  confThreshold: 0.01,
   iouThreshold: 0.45,
   inputSize: 640,
 };
