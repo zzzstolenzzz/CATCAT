@@ -80,7 +80,29 @@ button:hover:not(:disabled) { background: #333; border-color: #555; }
 button:active:not(:disabled) { background: #2a2a2a; }
 button:disabled { opacity: 0.35; cursor: default; }
 
-#image-counter { color: #666; font-size: 0.82rem; margin-left: auto; }
+#image-counter { color: #666; font-size: 0.82rem; }
+
+#enhance-controls {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-left: auto;
+}
+
+#enhance-controls label {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 0.75rem;
+  color: #777;
+  white-space: nowrap;
+}
+
+#enhance-controls input[type=range] {
+  width: 70px;
+  accent-color: #7eb8f7;
+  cursor: pointer;
+}
 
 #canvas-container {
   flex: 1;
@@ -95,7 +117,13 @@ button:disabled { opacity: 0.35; cursor: default; }
   min-height: 0;
 }
 
-#main-canvas { display: block; }
+#image-canvas, #main-canvas {
+  display: block;
+  position: absolute;
+  top: 0; left: 0;
+}
+
+#main-canvas { background: transparent; }
 
 #canvas-hint {
   position: absolute;

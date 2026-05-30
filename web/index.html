@@ -17,13 +17,28 @@
       </div>
     </header>
 
+    <!-- SVG sharpen filter -->
+    <svg width="0" height="0" style="position:absolute">
+      <filter id="sharpen-filter">
+        <feConvolveMatrix id="sharpen-kernel" order="3"
+          kernelMatrix="0 0 0 0 1 0 0 0 0" preserveAlpha="true"/>
+      </filter>
+    </svg>
+
     <div id="toolbar">
       <input type="file" id="file-input" accept="image/*" multiple hidden>
       <button id="load-btn">Load Images</button>
       <span id="image-counter">No images loaded</span>
+      <div id="enhance-controls">
+        <label>Bright<input type="range" id="brightness" min="50" max="200" value="100"></label>
+        <label>Contrast<input type="range" id="contrast" min="50" max="300" value="100"></label>
+        <label>Sharpen<input type="range" id="sharpen" min="0" max="100" value="0"></label>
+        <button id="reset-enhance">Reset</button>
+      </div>
     </div>
 
     <div id="canvas-container">
+      <canvas id="image-canvas"></canvas>
       <canvas id="main-canvas"></canvas>
       <div id="canvas-hint">Click "Load Images" to begin</div>
     </div>

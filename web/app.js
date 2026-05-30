@@ -19,6 +19,8 @@ let canvasOffsetX = 0, canvasOffsetY = 0;
 let imgDisplayW = 0, imgDisplayH = 0;
 
 // --- DOM refs ---
+const imageCanvas = document.getElementById('image-canvas');
+const imageCtx = imageCanvas.getContext('2d');
 const canvas = document.getElementById('main-canvas');
 const ctx = canvas.getContext('2d');
 const hint = document.getElementById('canvas-hint');
@@ -33,6 +35,27 @@ const backBtn = document.getElementById('back-btn');
 const skipBtn = document.getElementById('skip-btn');
 const loadBtn = document.getElementById('load-btn');
 const fileInput = document.getElementById('file-input');
+const brightnessSlider = document.getElementById('brightness');
+const contrastSlider = document.getElementById('contrast');
+const sharpenSlider = document.getElementById('sharpen');
+const sharpenKernel = document.getElementById('sharpen-kernel');
+
+function applyEnhance() {
+  const b = brightnessSlider.value / 100;
+  const c = contrastSlider.value / 100;
+  const s = sharpenSlider.value / 100;
+  const k = s * 0.8;
+  sharpenKernel.setAttribute('kernelMatrix', `0 ${-k} 0 ${-k} ${1+4*k} ${-k} 0 ${-k} 0`);
+  imageCanvas.style.filter = `brightness(${b}) contrast(${c})${s > 0 ? ' url(#sharpen-filter)' : ''}`;
+}
+
+[brightnessSlider, contrastSlider, sharpenSlider].forEach(s => s.addEventListener('input', applyEnhance));
+document.getElementById('reset-enhance').addEventListener('click', () => {
+  brightnessSlider.value = 100;
+  contrastSlider.value = 100;
+  sharpenSlider.value = 0;
+  applyEnhance();
+});
 
 const setStatus = msg => { statusEl.textContent = msg; };
 
@@ -159,14 +182,15 @@ function computeLayout() {
   imgDisplayH = ih * scale;
   canvasOffsetX = (cw - imgDisplayW) / 2;
   canvasOffsetY = (ch - imgDisplayH) / 2;
-  canvas.width = cw;
-  canvas.height = ch;
+  canvas.width = cw; canvas.height = ch;
+  imageCanvas.width = cw; imageCanvas.height = ch;
 }
 
 function render(preview = null) {
   if (!currentImageEl) return;
+  imageCtx.clearRect(0, 0, imageCanvas.width, imageCanvas.height);
+  imageCtx.drawImage(currentImageEl, canvasOffsetX, canvasOffsetY, imgDisplayW, imgDisplayH);
   ctx.clearRect(0, 0, canvas.width, canvas.height);
-  ctx.drawImage(currentImageEl, canvasOffsetX, canvasOffsetY, imgDisplayW, imgDisplayH);
 
   const drawBox = (b, color) => {
     ctx.strokeStyle = color;
