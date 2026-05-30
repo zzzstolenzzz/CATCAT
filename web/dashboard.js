@@ -1,0 +1,222 @@
+'use strict';
+
+const API = window.CATCAT_CONFIG.backendUrl;
+
+// ── Chart setup ────────────────────────────────────────────────────────────────
+
+Chart.defaults.color = 'rgba(255,255,255,0.4)';
+Chart.defaults.borderColor = 'rgba(255,255,255,0.07)';
+Chart.defaults.font.family = "'Segoe UI', system-ui, sans-serif";
+
+function makeGradient(ctx, color) {
+  const g = ctx.createLinearGradient(0, 0, 0, 200);
+  g.addColorStop(0, color.replace(')', ',0.25)').replace('rgb', 'rgba'));
+  g.addColorStop(1, color.replace(')', ',0)').replace('rgb', 'rgba'));
+  return g;
+}
+
+const mapCtx = document.getElementById('map-chart').getContext('2d');
+const mapChart = new Chart(mapCtx, {
+  type: 'line',
+  data: { labels: [], datasets: [{
+    label: 'mAP50',
+    data: [],
+    borderColor: '#00ccff',
+    backgroundColor: makeGradient(mapCtx, 'rgb(0,204,255)'),
+    borderWidth: 2,
+    tension: 0.4,
+    pointBackgroundColor: '#00ccff',
+    pointBorderColor: '#060c18',
+    pointBorderWidth: 2,
+    pointRadius: 5,
+    fill: true,
+  }]},
+  options: {
+    responsive: true, maintainAspectRatio: false,
+    plugins: { legend: { display: false } },
+    scales: {
+      x: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { maxTicksLimit: 8 } },
+      y: {
+        min: 0, max: 1,
+        grid: { color: 'rgba(255,255,255,0.05)' },
+        ticks: { callback: v => (v * 100).toFixed(0) + '%' },
+      },
+    },
+    animation: { duration: 600, easing: 'easeInOutQuart' },
+  },
+});
+
+const runCtx = document.getElementById('run-chart').getContext('2d');
+const runChart = new Chart(runCtx, {
+  type: 'bar',
+  data: { labels: [], datasets: [{
+    label: 'Annotations',
+    data: [],
+    backgroundColor: 'rgba(167,139,250,0.6)',
+    borderColor: '#a78bfa',
+    borderWidth: 1,
+    borderRadius: 4,
+  }]},
+  options: {
+    responsive: true, maintainAspectRatio: false,
+    plugins: { legend: { display: false } },
+    scales: {
+      x: { grid: { display: false } },
+      y: { grid: { color: 'rgba(255,255,255,0.05)' }, beginAtZero: true, ticks: { precision: 0 } },
+    },
+    animation: { duration: 600 },
+  },
+});
+
+// ── DOM refs ───────────────────────────────────────────────────────────────────
+
+const els = id => document.getElementById(id);
+
+// ── Number animation ──────────────────────────────────────────────────────────
+
+const _prev = {};
+function animateTo(id, val, suffix = '', decimals = 0) {
+  const el = els(id);
+  if (!el) return;
+  const from = _prev[id] ?? 0;
+  if (from === val) return;
+  _prev[id] = val;
+  const start = performance.now();
+  const dur = 600;
+  const step = ts => {
+    const t = Math.min((ts - start) / dur, 1);
+    const ease = 1 - Math.pow(1 - t, 3);
+    const cur = from + (val - from) * ease;
+    el.textContent = decimals ? cur.toFixed(decimals) + suffix : Math.round(cur) + suffix;
+    if (t < 1) requestAnimationFrame(step);
+  };
+  requestAnimationFrame(step);
+}
+
+// ── Training ring ─────────────────────────────────────────────────────────────
+
+function updateEngine(stats) {
+  const ring     = els('ring-progress');
+  const ringStatus = els('ring-status');
+  const ringDetail = els('ring-detail');
+  const circumference = 314;
+
+  if (stats.training) {
+    ring.classList.add('training');
+    ringStatus.classList.add('training');
+    ringStatus.textContent = 'TRAINING';
+    const elapsed = stats.training_elapsed_s ?? 0;
+    const mins = Math.floor(elapsed / 60), secs = elapsed % 60;
+    ringDetail.textContent = `${mins}m ${secs}s elapsed`;
+    ring.style.strokeDashoffset = circumference * 0.15;
+  } else {
+    ring.classList.remove('training');
+    ringStatus.classList.remove('training');
+    ringStatus.textContent = 'IDLE';
+    ringDetail.textContent = 'Ready';
+    ring.style.strokeDashoffset = circumference;
+  }
+
+  const every = stats.train_every ?? 5;
+  const queue = stats.images_in_queue ?? 0;
+  const pct = Math.min(queue / every, 1);
+
+  els('eng-next').textContent = `${queue} / ${every} images`;
+  els('eng-every').textContent = `${every} annotations`;
+
+  const mv = stats.model_version;
+  if (mv && mv !== 'initial') {
+    const ts = parseInt(mv, 10);
+    if (!isNaN(ts)) {
+      const d = new Date(ts * 1000);
+      els('eng-version').textContent = `v${stats.training_run_count ?? '—'}`;
+      els('eng-updated').textContent = d.toLocaleTimeString();
+    }
+  } else {
+    els('eng-version').textContent = 'base model';
+    els('eng-updated').textContent = '—';
+  }
+
+  // Queue progress ring
+  const offset = 251 * (1 - pct);
+  els('p-fill').style.strokeDashoffset = offset;
+  els('progress-pct').textContent = Math.round(pct * 100) + '%';
+  els('pinfo-done').textContent = `${stats.total_annotations ?? 0} annotated`;
+  els('pinfo-queue').textContent = `${queue} in queue`;
+  els('pinfo-needed').textContent = `${every} needed to train`;
+}
+
+// ── Stats update ──────────────────────────────────────────────────────────────
+
+let lastStats = null;
+
+async function fetchStats() {
+  try {
+    const data = await (await fetch(`${API}/stats`)).json();
+    lastStats = data;
+
+    animateTo('stat-annotations', data.total_annotations ?? 0);
+    animateTo('stat-queue', data.images_in_queue ?? 0);
+    animateTo('stat-runs', data.training_run_count ?? 0);
+
+    if (data.map50 != null) {
+      animateTo('stat-map', data.map50 * 100, '%', 1);
+    } else {
+      els('stat-map').textContent = '—';
+    }
+
+    const next = Math.max(0, (data.train_every ?? 5) - (data.images_in_queue ?? 0));
+    els('stat-annotations-sub').textContent =
+      data.training ? 'training in progress…' : `${next} until next train`;
+    els('stat-queue-sub').textContent =
+      data.images_in_queue > 0 ? 'pending training' : 'queue empty';
+    els('stat-runs-sub').textContent =
+      data.training ? '⚡ running now' : 'completed cycles';
+
+    updateEngine(data);
+    els('last-refresh').textContent = 'Updated ' + new Date().toLocaleTimeString();
+  } catch (e) {
+    console.warn('Stats fetch failed:', e);
+  }
+}
+
+// ── History update ────────────────────────────────────────────────────────────
+
+async function fetchHistory() {
+  try {
+    const history = await (await fetch(`${API}/history`)).json();
+    if (!history.length) return;
+
+    els('map-empty').classList.add('hidden');
+    els('run-empty').classList.add('hidden');
+
+    const labels = history.map(h => {
+      const d = new Date(h.timestamp * 1000);
+      return d.toLocaleDateString([], { month: 'short', day: 'numeric' }) + ' ' +
+             d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    });
+
+    mapChart.data.labels = labels;
+    mapChart.data.datasets[0].data = history.map(h => h.map50 ?? 0);
+    mapChart.update();
+
+    runChart.data.labels = history.map((_, i) => `Run ${i + 1}`);
+    runChart.data.datasets[0].data = history.map(h => h.annotation_count ?? 0);
+    runChart.update();
+
+    // Update map badge with latest
+    const latest = history[history.length - 1];
+    if (latest?.map50 != null) {
+      els('map-badge').textContent = `mAP50 · ${(latest.map50 * 100).toFixed(1)}%`;
+    }
+  } catch (e) {
+    console.warn('History fetch failed:', e);
+  }
+}
+
+// ── Boot ──────────────────────────────────────────────────────────────────────
+
+fetchStats();
+fetchHistory();
+setInterval(fetchStats, 10000);
+setInterval(fetchHistory, 60000);

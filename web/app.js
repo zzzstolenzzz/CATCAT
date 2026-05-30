@@ -40,6 +40,10 @@ const contrastSlider = document.getElementById('contrast');
 const sharpenSlider = document.getElementById('sharpen');
 const sharpenKernel = document.getElementById('sharpen-kernel');
 
+document.getElementById('theme-toggle').addEventListener('change', e => {
+  document.body.dataset.theme = e.target.checked ? 'modern' : '';
+});
+
 function applyEnhance() {
   const b = brightnessSlider.value / 100;
   const c = contrastSlider.value / 100;
@@ -355,7 +359,7 @@ async function accept() {
   sessionCount++;
   sessionEl.textContent = `Session: ${sessionCount}`;
 
-  if (boxes.length > 0) await submitAnnotation(images[currentIndex].name, boxes);
+  if (boxes.length > 0) await submitAnnotation(images[currentIndex].name, boxes, images[currentIndex].file);
   advance();
 }
 
@@ -370,19 +374,45 @@ function advance() {
   }
 }
 
+// --- Model version polling ---
+let currentModelVersion = null;
+
+async function pollStats() {
+  try {
+    const data = await (await fetch(`${CONFIG.backendUrl}/stats`)).json();
+    if (data.map50 != null) updateMap(data.map50);
+    if (data.training) setStatus('Model training in background…');
+    if (data.model_version) {
+      if (currentModelVersion && data.model_version !== currentModelVersion) {
+        setStatus('New model ready — reloading…');
+        currentModelVersion = data.model_version;
+        await initModel();
+        setStatus('Model updated!');
+      } else {
+        currentModelVersion = data.model_version;
+      }
+    }
+  } catch (_) {}
+}
+
+setInterval(pollStats, 60000);
+
 // --- Submit to HF Space ---
-async function submitAnnotation(imageName, boxes) {
+async function submitAnnotation(imageName, boxes, imageFile) {
   setStatus(`Submitting annotation for ${imageName}…`);
   try {
-    const resp = await fetch(`${CONFIG.backendUrl}/annotate`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ image_name: imageName, boxes }),
-    });
+    const fd = new FormData();
+    fd.append('image', imageFile, imageName);
+    fd.append('boxes', JSON.stringify(boxes));
+    fd.append('image_name', imageName);
+
+    const resp = await fetch(`${CONFIG.backendUrl}/annotate`, { method: 'POST', body: fd });
     if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
     const data = await resp.json();
-    setStatus(`Saved — ${data.total_annotations} total annotations in shared dataset`);
+    const trainingNote = data.training ? ' · training started…' : '';
+    setStatus(`Saved — ${data.total_annotations} annotations${trainingNote}`);
     if (data.map50 != null) updateMap(data.map50);
+    if (data.model_version) currentModelVersion = data.model_version;
   } catch (e) {
     setStatus(`Saved locally (backend offline: ${e.message})`);
   }

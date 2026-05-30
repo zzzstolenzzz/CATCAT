@@ -1,4 +1,7 @@
 fastapi
 uvicorn
 huggingface_hub
-pydantic
+python-multipart
+ultralytics
+onnx
+onnxslim

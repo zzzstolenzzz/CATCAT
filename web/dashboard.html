@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CATCAT — Dashboard</title>
+  <link rel="stylesheet" href="dashboard.css">
+</head>
+<body>
+  <div id="root">
+    <header>
+      <div class="brand">
+        <span class="brand-name">CATCAT</span>
+        <span class="brand-sub">Mission Dashboard</span>
+      </div>
+      <div class="header-right">
+        <div class="live-dot"></div>
+        <span class="live-label">LIVE</span>
+        <a href="index.html" class="back-btn">← Annotator</a>
+      </div>
+    </header>
+
+    <div class="stat-grid">
+      <div class="stat-card accent-blue">
+        <div class="stat-top">
+          <span class="stat-icon">◈</span>
+          <span class="stat-label">Total Annotations</span>
+        </div>
+        <div class="stat-number" id="stat-annotations">—</div>
+        <div class="stat-sub" id="stat-annotations-sub">loading…</div>
+      </div>
+
+      <div class="stat-card accent-orange">
+        <div class="stat-top">
+          <span class="stat-icon">⬡</span>
+          <span class="stat-label">Images in Queue</span>
+        </div>
+        <div class="stat-number" id="stat-queue">—</div>
+        <div class="stat-sub" id="stat-queue-sub">awaiting training</div>
+      </div>
+
+      <div class="stat-card accent-green">
+        <div class="stat-top">
+          <span class="stat-icon">◎</span>
+          <span class="stat-label">Model Accuracy</span>
+        </div>
+        <div class="stat-number" id="stat-map">—</div>
+        <div class="stat-sub">mAP50</div>
+      </div>
+
+      <div class="stat-card accent-purple">
+        <div class="stat-top">
+          <span class="stat-icon">⬟</span>
+          <span class="stat-label">Training Runs</span>
+        </div>
+        <div class="stat-number" id="stat-runs">—</div>
+        <div class="stat-sub" id="stat-runs-sub">completed cycles</div>
+      </div>
+    </div>
+
+    <div class="main-grid">
+      <div class="panel chart-panel">
+        <div class="panel-header">
+          <span class="panel-title">Model Accuracy Over Time</span>
+          <span class="panel-badge" id="map-badge">mAP50</span>
+        </div>
+        <div class="chart-wrap">
+          <canvas id="map-chart"></canvas>
+          <div class="chart-empty" id="map-empty">No training runs yet</div>
+        </div>
+      </div>
+
+      <div class="panel status-panel">
+        <div class="panel-header">
+          <span class="panel-title">Training Engine</span>
+        </div>
+        <div class="engine-body">
+          <div class="engine-ring" id="engine-ring">
+            <svg viewBox="0 0 120 120" class="ring-svg">
+              <circle class="ring-track" cx="60" cy="60" r="50"/>
+              <circle class="ring-progress" id="ring-progress" cx="60" cy="60" r="50"
+                stroke-dasharray="314" stroke-dashoffset="314"/>
+            </svg>
+            <div class="ring-inner">
+              <div class="ring-status" id="ring-status">IDLE</div>
+              <div class="ring-detail" id="ring-detail">Ready</div>
+            </div>
+          </div>
+          <div class="engine-stats">
+            <div class="engine-row">
+              <span class="engine-key">Next train at</span>
+              <span class="engine-val" id="eng-next">—</span>
+            </div>
+            <div class="engine-row">
+              <span class="engine-key">Train every</span>
+              <span class="engine-val" id="eng-every">—</span>
+            </div>
+            <div class="engine-row">
+              <span class="engine-key">Model version</span>
+              <span class="engine-val" id="eng-version">—</span>
+            </div>
+            <div class="engine-row">
+              <span class="engine-key">Last updated</span>
+              <span class="engine-val" id="eng-updated">—</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="panel chart-panel">
+        <div class="panel-header">
+          <span class="panel-title">Annotations per Training Run</span>
+        </div>
+        <div class="chart-wrap">
+          <canvas id="run-chart"></canvas>
+          <div class="chart-empty" id="run-empty">No training runs yet</div>
+        </div>
+      </div>
+
+      <div class="panel progress-panel">
+        <div class="panel-header">
+          <span class="panel-title">Queue Progress</span>
+        </div>
+        <div class="progress-body">
+          <div class="progress-ring-wrap">
+            <svg viewBox="0 0 100 100" class="progress-svg">
+              <circle class="p-track" cx="50" cy="50" r="40"/>
+              <circle class="p-fill" id="p-fill" cx="50" cy="50" r="40"
+                stroke-dasharray="251" stroke-dashoffset="251"/>
+            </svg>
+            <div class="progress-label">
+              <div class="progress-pct" id="progress-pct">0%</div>
+              <div class="progress-desc">to next train</div>
+            </div>
+          </div>
+          <div class="progress-info">
+            <div class="pinfo-row">
+              <div class="pinfo-dot dot-done"></div>
+              <span id="pinfo-done">0 annotated</span>
+            </div>
+            <div class="pinfo-row">
+              <div class="pinfo-dot dot-queue"></div>
+              <span id="pinfo-queue">0 in queue</span>
+            </div>
+            <div class="pinfo-row">
+              <div class="pinfo-dot dot-needed"></div>
+              <span id="pinfo-needed">5 needed to train</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="footer">
+      <span>CATCAT · Computer-Assisted Target Classification and Annotation Tool</span>
+      <span id="last-refresh">—</span>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <script src="config.js?v=3"></script>
+  <script src="dashboard.js?v=3"></script>
+</body>
+</html>

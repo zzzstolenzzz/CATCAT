@@ -10,6 +10,13 @@
   <div id="app">
     <header>
       <h1>CATCAT <span style="font-size:0.65em;font-weight:400;color:#555;letter-spacing:0.05em">Computer-Assisted Target Classification and Annotation Tool</span></h1>
+      <label class="theme-toggle" title="Switch theme">
+        Stealth
+        <input type="checkbox" id="theme-toggle">
+        <span class="toggle-track"><span class="toggle-thumb"></span></span>
+        Modern
+      </label>
+      <a href="dashboard.html" style="font-size:0.78rem;color:#555;text-decoration:none;margin-left:6px;padding:4px 10px;border:1px solid #2a2a2a;border-radius:4px;" onmouseover="this.style.color='#888'" onmouseout="this.style.color='#555'">Dashboard →</a>
       <div id="metrics">
         <span id="session-count">Session: 0</span>
         <span id="map-display">mAP50: —</span>
