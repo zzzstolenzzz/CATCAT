@@ -1,0 +1,13 @@
+dist/
+build/
+app.spec
+__pycache__/
+*.pyc
+.vscode/
+.ipynb_checkpoints/
+data/images/
+data/labels/
+data/labels.cache
+runs/
+*.onnx
+*.pt

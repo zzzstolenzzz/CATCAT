@@ -1,0 +1,131 @@
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  background: #0d0d0d;
+  color: #e0e0e0;
+  font-family: 'Segoe UI', system-ui, sans-serif;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+#app {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  max-width: 1400px;
+  margin: 0 auto;
+  width: 100%;
+  padding: 8px;
+  gap: 6px;
+}
+
+header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 14px;
+  background: #1a1a1a;
+  border-radius: 6px;
+  flex-shrink: 0;
+}
+
+h1 {
+  font-size: 1.1rem;
+  letter-spacing: 0.15em;
+  color: #7eb8f7;
+  font-weight: 600;
+}
+
+#metrics {
+  display: flex;
+  gap: 20px;
+  font-size: 0.82rem;
+  color: #888;
+  align-items: center;
+}
+
+#map-display { transition: color 0.3s; }
+#map-display.improved { color: #4caf50; }
+#map-display.declined { color: #f44336; }
+
+#model-status { color: #666; font-style: italic; }
+#model-status.ready { color: #4caf50; font-style: normal; }
+#model-status.error { color: #f44336; font-style: normal; }
+
+#toolbar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 14px;
+  background: #1a1a1a;
+  border-radius: 6px;
+  flex-shrink: 0;
+}
+
+button {
+  background: #252525;
+  color: #ddd;
+  border: 1px solid #3a3a3a;
+  border-radius: 4px;
+  padding: 5px 14px;
+  cursor: pointer;
+  font-size: 0.82rem;
+  transition: background 0.12s;
+  white-space: nowrap;
+}
+
+button:hover:not(:disabled) { background: #333; border-color: #555; }
+button:active:not(:disabled) { background: #2a2a2a; }
+button:disabled { opacity: 0.35; cursor: default; }
+
+#image-counter { color: #666; font-size: 0.82rem; margin-left: auto; }
+
+#canvas-container {
+  flex: 1;
+  background: #111;
+  border-radius: 6px;
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: crosshair;
+  min-height: 0;
+}
+
+#main-canvas { display: block; }
+
+#canvas-hint {
+  position: absolute;
+  color: #333;
+  font-size: 1rem;
+  pointer-events: none;
+  user-select: none;
+}
+
+#action-buttons {
+  display: flex;
+  gap: 8px;
+  padding: 6px 14px;
+  background: #1a1a1a;
+  border-radius: 6px;
+  flex-shrink: 0;
+}
+
+#accept-btn {
+  background: #0f2d0f;
+  border-color: #1e5c1e;
+  color: #6ecf6e;
+}
+#accept-btn:hover:not(:disabled) { background: #153a15; }
+
+#status-bar {
+  padding: 5px 14px;
+  background: #1a1a1a;
+  border-radius: 6px;
+  font-size: 0.78rem;
+  color: #555;
+  flex-shrink: 0;
+}

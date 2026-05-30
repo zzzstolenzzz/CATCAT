@@ -1,0 +1,85 @@
+name: Retrain and publish model
+
+on:
+  schedule:
+    - cron: '0 3 * * 0'  # every Sunday at 3am UTC
+  workflow_dispatch:      # or trigger manually from GitHub UI
+
+jobs:
+  retrain:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: pip install ultralytics huggingface_hub
+
+      - name: Download annotations from HF Dataset
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+          DATASET_REPO: ${{ secrets.DATASET_REPO }}
+        run: |
+          python - <<'EOF'
+          import os
+          from huggingface_hub import snapshot_download
+          snapshot_download(
+              repo_id=os.environ["DATASET_REPO"],
+              repo_type="dataset",
+              local_dir="data",
+              token=os.environ["HF_TOKEN"],
+          )
+          EOF
+
+      - name: Retrain YOLOv8
+        run: |
+          python - <<'EOF'
+          from ultralytics import YOLO
+          model = YOLO("yolov8n.pt")
+          model.train(data="data/dataset.yaml", epochs=10, imgsz=640, project="runs", name="ship")
+          EOF
+
+      - name: Export to ONNX
+        run: python scripts/export_onnx.py --weights runs/ship/weights/best.pt
+
+      - name: Write metrics.json
+        run: |
+          python - <<'EOF'
+          import csv, json
+          from pathlib import Path
+
+          results = list(csv.DictReader(open("runs/ship/results.csv")))
+          last = results[-1]
+          metrics = {"map50": float(last["metrics/mAP50(B)"])}
+          Path("runs/ship/weights/metrics.json").write_text(json.dumps(metrics))
+          EOF
+
+      - name: Upload model + metrics to HF Hub
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+          MODEL_REPO: ${{ secrets.MODEL_REPO }}
+          DATASET_REPO: ${{ secrets.DATASET_REPO }}
+        run: |
+          python - <<'EOF'
+          import os
+          from huggingface_hub import HfApi
+          api = HfApi(token=os.environ["HF_TOKEN"])
+
+          api.upload_file(
+              path_or_fileobj="runs/ship/weights/best.onnx",
+              path_in_repo="model.onnx",
+              repo_id=os.environ["MODEL_REPO"],
+              repo_type="model",
+              commit_message="Retrain: updated model.onnx",
+          )
+          api.upload_file(
+              path_or_fileobj="runs/ship/weights/metrics.json",
+              path_in_repo="metrics.json",
+              repo_id=os.environ["DATASET_REPO"],
+              repo_type="dataset",
+              commit_message="Retrain: update metrics",
+          )
+          EOF

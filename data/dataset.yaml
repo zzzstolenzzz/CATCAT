@@ -1,0 +1,6 @@
+names:
+- ship
+nc: 1
+path: C:\Repos\REAGAN\data
+train: images
+val: images
