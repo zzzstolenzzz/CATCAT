@@ -12,6 +12,7 @@ let userBoxes = [];      // [{x1,y1,x2,y2}] normalized 0-1
 let isDrawing = false;
 let drawStart = null;
 let sessionCount = 0;
+let mousePos = null;
 
 // Canvas layout (recomputed on each image load and resize)
 let canvasOffsetX = 0, canvasOffsetY = 0;
@@ -56,20 +57,32 @@ async function initModel() {
   }
 }
 
-// --- Preprocessing ---
+// --- Preprocessing (letterbox, matching YOLOv8 training preprocessing) ---
+let _letterbox = { padX: 0, padY: 0, scale: 1 };
+
 function imageToTensor(img) {
   const size = CONFIG.inputSize;
+  const scale = Math.min(size / img.naturalWidth, size / img.naturalHeight);
+  const scaledW = Math.round(img.naturalWidth * scale);
+  const scaledH = Math.round(img.naturalHeight * scale);
+  const padX = Math.floor((size - scaledW) / 2);
+  const padY = Math.floor((size - scaledH) / 2);
+  _letterbox = { padX, padY, scale };
+
   const off = document.createElement('canvas');
   off.width = size; off.height = size;
   const offCtx = off.getContext('2d');
-  offCtx.drawImage(img, 0, 0, size, size);
+  offCtx.fillStyle = 'rgb(114,114,114)'; // YOLOv8 default pad color
+  offCtx.fillRect(0, 0, size, size);
+  offCtx.drawImage(img, padX, padY, scaledW, scaledH);
+
   const { data } = offCtx.getImageData(0, 0, size, size);
   const area = size * size;
   const t = new Float32Array(3 * area);
   for (let i = 0; i < area; i++) {
-    t[i]          = data[i * 4]     / 255; // R
-    t[area + i]   = data[i * 4 + 1] / 255; // G
-    t[2*area + i] = data[i * 4 + 2] / 255; // B
+    t[i]          = data[i * 4]     / 255;
+    t[area + i]   = data[i * 4 + 1] / 255;
+    t[2*area + i] = data[i * 4 + 2] / 255;
   }
   return new ort.Tensor('float32', t, [1, 3, size, size]);
 }
@@ -113,17 +126,23 @@ async function detect(img) {
   console.log('Max confidence in output:', maxConf);
   const size = CONFIG.inputSize;
   const candidates = [];
+  const { padX, padY, scale } = _letterbox;
+  const scaledW = img.naturalWidth * scale;
+  const scaledH = img.naturalHeight * scale;
+
   for (let i = 0; i < n; i++) {
-    // For multi-class models, take max score across all class columns
     let conf = 0;
     for (let c = 4; c < features; c++) {
       if (raw[c * n + i] > conf) conf = raw[c * n + i];
     }
     if (conf <= CONFIG.confThreshold) continue;
     const cx = raw[i], cy = raw[n+i], w = raw[2*n+i], h = raw[3*n+i];
+    // Reverse letterbox padding to get normalized image coords
     candidates.push({
-      x1: (cx - w/2) / size, y1: (cy - h/2) / size,
-      x2: (cx + w/2) / size, y2: (cy + h/2) / size,
+      x1: Math.max(0, (cx - w/2 - padX) / scaledW),
+      y1: Math.max(0, (cy - h/2 - padY) / scaledH),
+      x2: Math.min(1, (cx + w/2 - padX) / scaledW),
+      y2: Math.min(1, (cy + h/2 - padY) / scaledH),
       conf,
     });
   }
@@ -170,6 +189,15 @@ function render(preview = null) {
     ctx.strokeRect(preview.x, preview.y, preview.w, preview.h);
     ctx.setLineDash([]);
   }
+
+  if (mousePos && currentImageEl) {
+    ctx.strokeStyle = '#ffd600';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(mousePos.x, 0); ctx.lineTo(mousePos.x, canvas.height);
+    ctx.moveTo(0, mousePos.y); ctx.lineTo(canvas.width, mousePos.y);
+    ctx.stroke();
+  }
 }
 
 // --- Canvas → normalized image coords ---
@@ -189,14 +217,20 @@ canvas.addEventListener('mousedown', e => {
 });
 
 canvas.addEventListener('mousemove', e => {
-  if (!isDrawing) return;
   const r = canvas.getBoundingClientRect();
   const x = e.clientX - r.left, y = e.clientY - r.top;
-  render({
-    x: Math.min(drawStart.x, x), y: Math.min(drawStart.y, y),
-    w: Math.abs(x - drawStart.x), h: Math.abs(y - drawStart.y),
-  });
+  mousePos = { x, y };
+  if (isDrawing) {
+    render({
+      x: Math.min(drawStart.x, x), y: Math.min(drawStart.y, y),
+      w: Math.abs(x - drawStart.x), h: Math.abs(y - drawStart.y),
+    });
+  } else {
+    render();
+  }
 });
+
+canvas.addEventListener('mouseleave', () => { mousePos = null; render(); });
 
 canvas.addEventListener('mouseup', e => {
   if (!isDrawing) return;
@@ -208,11 +242,11 @@ canvas.addEventListener('mouseup', e => {
   drawStart = null;
 
   if (n2.x - n1.x > 0.01 && n2.y - n1.y > 0.01) {
-    detectionBoxes = []; // user correction replaces auto-detections
-    userBoxes.push({
+    detectionBoxes = [];
+    userBoxes = [{
       x1: Math.max(0, n1.x), y1: Math.max(0, n1.y),
       x2: Math.min(1, n2.x), y2: Math.min(1, n2.y),
-    });
+    }];
   }
   render();
 });
@@ -269,7 +303,15 @@ async function loadCurrentImage() {
 
 // --- Actions ---
 acceptBtn.addEventListener('click', accept);
-document.addEventListener('keydown', e => { if (e.key === 'Enter') accept(); });
+let acceptCooldown = false;
+document.addEventListener('keydown', e => {
+  if (e.key === 'Enter' && !e.repeat && !acceptCooldown) {
+    e.preventDefault();
+    acceptCooldown = true;
+    accept();
+    setTimeout(() => { acceptCooldown = false; }, 400);
+  }
+});
 
 clearBtn.addEventListener('click', () => {
   userBoxes = [];
