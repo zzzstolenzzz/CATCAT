@@ -98,11 +98,27 @@ function nms(boxes) {
 // --- Inference ---
 async function detect(img) {
   if (!ortSession) return [];
-  const { data: raw } = (await ortSession.run({ images: imageToTensor(img) }))['output0'];
-  const n = 8400, size = CONFIG.inputSize;
+  const results = await ortSession.run({ images: imageToTensor(img) });
+  console.log('Output keys:', Object.keys(results));
+  const outputKey = Object.keys(results)[0];
+  const outputTensor = results[outputKey];
+  console.log('Output shape:', outputTensor.dims);
+  const raw = outputTensor.data;
+  const totalElements = raw.length;
+  // dims: [1, features, anchors] — infer anchors from shape
+  const features = outputTensor.dims[1];
+  const n = outputTensor.dims[2];
+  console.log(`features=${features}, anchors=${n}`);
+  const maxConf = Math.max(...Array.from(raw).slice(4 * n, 5 * n));
+  console.log('Max confidence in output:', maxConf);
+  const size = CONFIG.inputSize;
   const candidates = [];
   for (let i = 0; i < n; i++) {
-    const conf = raw[4*n + i];
+    // For multi-class models, take max score across all class columns
+    let conf = 0;
+    for (let c = 4; c < features; c++) {
+      if (raw[c * n + i] > conf) conf = raw[c * n + i];
+    }
     if (conf <= CONFIG.confThreshold) continue;
     const cx = raw[i], cy = raw[n+i], w = raw[2*n+i], h = raw[3*n+i];
     candidates.push({
