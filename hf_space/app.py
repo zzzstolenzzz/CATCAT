@@ -129,8 +129,15 @@ def _get_map50_from(repo, repo_type="model") -> Optional[float]:
     except Exception:
         return None
 
-def _upload_annotation(image_bytes, boxes_json, stem, ext, dataset_repo, state: dict):
-    """Upload image, label, and state in a single commit to avoid rate limits."""
+def _upload_annotation(image_bytes, boxes_json, stem, ext, dataset_repo, state: dict, corrected: bool = False):
+    """Upload image, label, state, and correction flag in a single commit."""
+    corrections = {}
+    try:
+        p = hf_hub_download(dataset_repo, "corrections.json", repo_type="dataset", token=HF_TOKEN)
+        corrections = json.loads(Path(p).read_text())
+    except Exception:
+        pass
+    corrections[stem] = corrected
     api.create_commit(
         repo_id=dataset_repo, repo_type="dataset",
         commit_message=f"annotate: {stem}",
@@ -140,6 +147,8 @@ def _upload_annotation(image_bytes, boxes_json, stem, ext, dataset_repo, state: 
                                path_or_fileobj="\n".join(to_yolo(b) for b in boxes_json).encode()),
             CommitOperationAdd(path_in_repo="state.json",
                                path_or_fileobj=json.dumps(state).encode()),
+            CommitOperationAdd(path_in_repo="corrections.json",
+                               path_or_fileobj=json.dumps(corrections).encode()),
         ],
         token=HF_TOKEN,
     )
@@ -179,6 +188,7 @@ async def annotate(
     image: UploadFile = File(...),
     boxes: str = Form(...),
     image_name: str = Form(...),
+    corrected: str = Form("0"),
 ):
     global _annotation_count, _is_training
     if not DATASET_REPO:
@@ -189,7 +199,7 @@ async def annotate(
     _annotation_count += 1
     _upload_annotation(await image.read(), json.loads(boxes), stem, ext, DATASET_REPO,
                        {"annotation_count": _annotation_count, "model_version": _model_version,
-                        "training_run_count": _training_run_count})
+                        "training_run_count": _training_run_count}, corrected == "1")
 
     if _annotation_count % TRAIN_EVERY == 0 and not _is_training:
         threading.Thread(target=_retrain_world, daemon=True).start()
@@ -230,6 +240,7 @@ async def team_annotate(
     image: UploadFile = File(...),
     boxes: str = Form(...),
     image_name: str = Form(...),
+    corrected: str = Form("0"),
     x_team_key: Optional[str] = Header(None),
 ):
     global _team_annotation_count, _team_is_training
@@ -243,7 +254,7 @@ async def team_annotate(
     _upload_annotation(await image.read(), json.loads(boxes), stem, ext, TEAM_DATASET_REPO,
                        {"annotation_count": _team_annotation_count,
                         "model_version": _team_model_version,
-                        "training_run_count": _team_training_run_count})
+                        "training_run_count": _team_training_run_count}, corrected == "1")
 
     if _team_annotation_count % TRAIN_EVERY == 0 and not _team_is_training:
         threading.Thread(target=_retrain_team, daemon=True).start()
@@ -408,6 +419,14 @@ def _run_training(dataset_repo, model_repo, base_weights_repo, progress_dict):
                 try: map50 = float(rows[-1]["metrics/mAP50(B)"])
                 except Exception: pass
 
+        # Load correction flags
+        corrections = {}
+        try:
+            p = hf_hub_download(dataset_repo, "corrections.json", repo_type="dataset", token=HF_TOKEN)
+            corrections = json.loads(Path(p).read_text())
+        except Exception:
+            pass
+
         # Per-image predictions
         image_stats = []
         try:
@@ -416,11 +435,13 @@ def _run_training(dataset_repo, model_repo, base_weights_repo, progress_dict):
             )
             for r in preds:
                 confs = r.boxes.conf.tolist() if r.boxes is not None and len(r.boxes) > 0 else []
+                stem = Path(r.path).stem
                 image_stats.append({
                     "name": Path(r.path).name,
                     "detections": len(confs),
                     "max_conf": round(max(confs), 3) if confs else 0.0,
                     "avg_conf": round(sum(confs) / len(confs), 3) if confs else 0.0,
+                    "corrected": corrections.get(stem, None),
                 })
         except Exception as e:
             print(f"[per-image stats error] {e}")
