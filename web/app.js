@@ -61,7 +61,16 @@ document.getElementById('reset-enhance').addEventListener('click', () => {
   applyEnhance();
 });
 
-const setStatus = msg => { statusEl.textContent = msg; };
+let _statusLocked = false;
+const setStatus = (msg, type) => {
+  if (_statusLocked && !type) return;
+  statusEl.textContent = msg;
+  statusEl.className = type || '';
+  if (type) {
+    _statusLocked = true;
+    setTimeout(() => { _statusLocked = false; statusEl.className = ''; }, 4000);
+  }
+};
 
 // --- Model loading ---
 async function initModel() {
@@ -419,11 +428,11 @@ async function submitAnnotation(imageName, boxes, imageFile) {
     if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
     const data = await resp.json();
     const trainingNote = data.training ? ' · training started…' : '';
-    setStatus(`Saved — ${data.total_annotations} team annotations${trainingNote}`);
+    setStatus(`Saved — ${data.total_annotations} team annotations${trainingNote}`, 'status-ok');
     if (data.map50 != null) updateMap(data.map50);
     if (data.model_version) currentModelVersion = data.model_version;
   } catch (e) {
-    setStatus(`Saved locally (backend offline: ${e.message})`);
+    setStatus(`Backend error: ${e.message}`, 'status-err');
   }
 }
 
