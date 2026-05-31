@@ -34,26 +34,18 @@ jobs:
           )
           EOF
 
+      - name: Generate dataset.yaml
+        run: |
+          printf "path: $(pwd)/data\ntrain: images\nval: images\nnc: 1\nnames: ['ship']\n" > data/dataset.yaml
+          echo "--- dataset.yaml ---"
+          cat data/dataset.yaml
+
       - name: Retrain YOLOv8
         run: |
           python - <<'EOF'
-          import os, yaml
-          from pathlib import Path
           from ultralytics import YOLO
-
-          # Generate dataset.yaml with correct absolute path for this runner
-          data_dir = Path(os.getcwd()) / "data"
-          yaml_path = data_dir / "dataset.yaml"
-          yaml_path.write_text(yaml.dump({
-              "path": str(data_dir),
-              "train": "images",
-              "val": "images",
-              "nc": 1,
-              "names": ["ship"],
-          }))
-
           model = YOLO("yolov8n.pt")
-          model.train(data=str(yaml_path), epochs=10, imgsz=640, project="runs", name="ship")
+          model.train(data="data/dataset.yaml", epochs=10, imgsz=640, project="runs", name="ship")
           EOF
 
       - name: Export to ONNX
