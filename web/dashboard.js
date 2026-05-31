@@ -102,14 +102,17 @@ function updateEngine(stats) {
   const circumference = 314;
 
   if (stats.training) {
+    _elapsedBase = stats.training_elapsed_s ?? 0;
+    _elapsedAt = Date.now();
     ring.classList.add('training');
     ringStatus.classList.add('training');
     ringStatus.textContent = 'TRAINING';
-    const elapsed = stats.training_elapsed_s ?? 0;
+    const elapsed = _elapsedBase;
     const mins = Math.floor(elapsed / 60), secs = elapsed % 60;
     const p = stats.training_progress ?? {};
     const epoch = p.epoch ?? 0, epochs = p.epochs ?? 5;
-    const pct = epochs > 0 ? epoch / epochs : 0;
+    // Use epochs+1 as denominator so 5/5 = ~83%, leaving arc for export/upload
+    const pct = epochs > 0 ? epoch / (epochs + 1) : 0;
     ring.style.strokeDashoffset = circumference * (1 - pct);
     ringDetail.textContent = epoch > 0
       ? `Epoch ${epoch}/${epochs} · ${mins}m ${secs}s`
@@ -118,6 +121,7 @@ function updateEngine(stats) {
     els('eng-epoch').textContent = epoch > 0 ? `${epoch} / ${epochs}` : 'Starting…';
     els('eng-loss').textContent = p.loss != null ? p.loss.toFixed(4) : '—';
   } else {
+    _elapsedAt = null;
     ring.classList.remove('training');
     ringStatus.classList.remove('training');
     ringStatus.textContent = 'IDLE';
@@ -159,6 +163,22 @@ function updateEngine(stats) {
 // ── Stats update ──────────────────────────────────────────────────────────────
 
 let lastStats = null;
+let _elapsedBase = 0;
+let _elapsedAt = null;
+
+setInterval(() => {
+  if (!lastStats?.training || _elapsedAt === null) return;
+  const elapsed = _elapsedBase + Math.floor((Date.now() - _elapsedAt) / 1000);
+  const mins = Math.floor(elapsed / 60), secs = elapsed % 60;
+  const p = lastStats.training_progress ?? {};
+  const epoch = p.epoch ?? 0, epochs = p.epochs ?? 5;
+  const label = epoch >= epochs ? `Finishing… ${mins}m ${secs.toString().padStart(2,'0')}s`
+    : epoch > 0 ? `Epoch ${epoch}/${epochs} · ${mins}m ${secs.toString().padStart(2,'0')}s`
+    : `Starting… ${mins}m ${secs.toString().padStart(2,'0')}s`;
+  const detail = label;
+  const ringDetail = document.getElementById('ring-detail');
+  if (ringDetail) ringDetail.textContent = detail;
+}, 1000);
 
 async function fetchStats() {
   try {
