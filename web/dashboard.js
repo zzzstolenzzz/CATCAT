@@ -237,10 +237,15 @@ async function fetchHistory() {
       if (hasImages) {
         const detail = document.createElement('tr');
         detail.className = 'run-detail hidden';
-        const imgRows = h.images.map(img =>
-          `<tr><td>${img.name}</td><td>${img.detections}</td><td>${img.max_conf > 0 ? (img.max_conf * 100).toFixed(1) + '%' : '—'}</td><td>${img.avg_conf > 0 ? (img.avg_conf * 100).toFixed(1) + '%' : '—'}</td></tr>`
-        ).join('');
-        detail.innerHTML = `<td colspan="5"><div class="run-detail-inner"><table class="img-table"><thead><tr><th>Image</th><th>Detections<span class="tip" data-tip="Number of ships the model found in this image.">?</span></th><th>Max Conf<span class="tip" data-tip="Highest confidence score among all detections. 100% = the model is certain it's a ship.">?</span></th><th>Avg Conf<span class="tip" data-tip="Average confidence across all detections in this image.">?</span></th></tr></thead><tbody>${imgRows}</tbody></table></div></td>`;
+        const imgRows = h.images.map(img => {
+          const labelCell = img.corrected === null || img.corrected === undefined
+            ? '—'
+            : img.corrected
+              ? '<span style="color:#ff9d00">Corrected</span>'
+              : '<span style="color:#00e87a">Model ✓</span>';
+          return `<tr><td>${img.name}</td><td>${img.detections}</td><td>${img.max_conf > 0 ? (img.max_conf * 100).toFixed(1) + '%' : '—'}</td><td>${img.avg_conf > 0 ? (img.avg_conf * 100).toFixed(1) + '%' : '—'}</td><td>${labelCell}</td></tr>`;
+        }).join('');
+        detail.innerHTML = `<td colspan="7"><div class="run-detail-inner"><table class="img-table"><thead><tr><th>Image</th><th>Detections<span class="tip" data-tip="Number of ships the model found in this image.">?</span></th><th>Max Conf<span class="tip" data-tip="Highest confidence score among all detections. 100% = the model is certain it's a ship.">?</span></th><th>Avg Conf<span class="tip" data-tip="Average confidence across all detections in this image.">?</span></th><th>Label<span class="tip" data-tip="Whether the user accepted the model's detection (Model ✓) or drew/corrected their own boxes (Corrected).">?</span></th></tr></thead><tbody>${imgRows}</tbody></table></div></td>`;
         tbody.appendChild(detail);
 
         tr.addEventListener('click', () => {

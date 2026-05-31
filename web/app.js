@@ -375,7 +375,8 @@ async function accept() {
   sessionCount++;
   sessionEl.textContent = `Session: ${sessionCount}`;
 
-  if (boxes.length > 0) await submitAnnotation(images[currentIndex].name, boxes, images[currentIndex].file);
+  const corrected = userBoxes.length > 0;
+  if (boxes.length > 0) await submitAnnotation(images[currentIndex].name, boxes, images[currentIndex].file, corrected);
   advance();
 }
 
@@ -414,13 +415,14 @@ async function pollStats() {
 setInterval(pollStats, 60000);
 
 // --- Submit to HF Space ---
-async function submitAnnotation(imageName, boxes, imageFile) {
+async function submitAnnotation(imageName, boxes, imageFile, corrected = false) {
   setStatus(`Submitting annotation for ${imageName}…`);
   try {
     const fd = new FormData();
     fd.append('image', imageFile, imageName);
     fd.append('boxes', JSON.stringify(boxes));
     fd.append('image_name', imageName);
+    fd.append('corrected', corrected ? '1' : '0');
 
     const resp = await fetch(`${CONFIG.backendUrl}/team/annotate`, {
       method: 'POST', body: fd, headers: { 'X-Team-Key': CONFIG.teamKey },
