@@ -211,7 +211,7 @@ async function fetchHistory() {
     mapChart.data.datasets[0].data = history.map(h => h.map50 ?? 0);
     mapChart.update();
 
-    // Group runs by date and populate table
+    // Populate runs table with expandable rows
     const tbody = els('runs-tbody');
     tbody.innerHTML = '';
     [...history].reverse().forEach((h, i) => {
@@ -220,9 +220,28 @@ async function fetchHistory() {
       const time = d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
       const run = history.length - i;
       const map = h.map50 != null ? (h.map50 * 100).toFixed(1) + '%' : '—';
+      const hasImages = h.images && h.images.length > 0;
+
       const tr = document.createElement('tr');
-      tr.innerHTML = `<td>#${run}</td><td>${date}</td><td>${time}</td><td>${map}</td><td>${h.annotation_count ?? '—'}</td>`;
+      tr.className = hasImages ? 'run-row expandable' : 'run-row';
+      tr.innerHTML = `<td>${hasImages ? '<span class="expand-arrow">▶</span>' : ''}#${run}</td><td>${date}</td><td>${time}</td><td>${map}</td><td>${h.annotation_count ?? '—'}</td>`;
       tbody.appendChild(tr);
+
+      if (hasImages) {
+        const detail = document.createElement('tr');
+        detail.className = 'run-detail hidden';
+        const imgRows = h.images.map(img =>
+          `<tr><td>${img.name}</td><td>${img.detections}</td><td>${img.max_conf > 0 ? (img.max_conf * 100).toFixed(1) + '%' : '—'}</td><td>${img.avg_conf > 0 ? (img.avg_conf * 100).toFixed(1) + '%' : '—'}</td></tr>`
+        ).join('');
+        detail.innerHTML = `<td colspan="5"><div class="run-detail-inner"><table class="img-table"><thead><tr><th>Image</th><th>Detections</th><th>Max Conf</th><th>Avg Conf</th></tr></thead><tbody>${imgRows}</tbody></table></div></td>`;
+        tbody.appendChild(detail);
+
+        tr.addEventListener('click', () => {
+          const open = !detail.classList.contains('hidden');
+          detail.classList.toggle('hidden', open);
+          tr.querySelector('.expand-arrow').textContent = open ? '▶' : '▼';
+        });
+      }
     });
 
     const latest = history[history.length - 1];

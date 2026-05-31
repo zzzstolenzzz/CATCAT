@@ -191,6 +191,16 @@ header {
 .runs-table td { padding: 6px 10px; border-bottom: 1px solid rgba(255,255,255,0.04); }
 .runs-table tr:last-child td { border-bottom: none; }
 .runs-table tr:hover td { background: rgba(255,255,255,0.03); }
+.run-row.expandable { cursor: pointer; }
+.run-row.expandable:hover td { background: rgba(0,204,255,0.06); }
+.expand-arrow { display: inline-block; margin-right: 6px; font-size: 0.7em; color: var(--dim); transition: transform 0.15s; }
+.run-detail td { padding: 0; border-bottom: 1px solid var(--border); }
+.run-detail.hidden { display: none; }
+.run-detail-inner { padding: 10px 16px; background: rgba(0,0,0,0.2); }
+.img-table { width: 100%; border-collapse: collapse; font-size: 0.78rem; }
+.img-table th { color: var(--dim); font-weight: 500; padding: 4px 8px; text-align: left; border-bottom: 1px solid var(--border); }
+.img-table td { padding: 4px 8px; border-bottom: 1px solid rgba(255,255,255,0.03); }
+.img-table tr:last-child td { border-bottom: none; }
 
 /* ── Training engine ─────────────────────────────────────────── */
 .engine-body { display: flex; gap: 20px; align-items: center; }
