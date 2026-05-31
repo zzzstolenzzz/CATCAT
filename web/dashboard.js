@@ -114,7 +114,8 @@ function updateEngine(stats) {
   const queue = stats.images_in_queue ?? 0;
   const pct = Math.min(queue / every, 1);
 
-  els('eng-next').textContent = `${queue} / ${every} images`;
+  const remaining = Math.max(0, every - queue);
+  els('eng-next').textContent = remaining === 0 ? `Ready (${queue} queued)` : `${remaining} more needed`;
   els('eng-every').textContent = `${every} annotations`;
 
   const mv = stats.model_version;
