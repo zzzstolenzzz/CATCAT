@@ -226,7 +226,7 @@ function render(preview = null) {
   }
 
   if (mousePos && currentImageEl) {
-    ctx.strokeStyle = '#ffd600';
+    ctx.strokeStyle = '#ff2020';
     ctx.lineWidth = 1;
     ctx.beginPath();
     ctx.moveTo(mousePos.x, 0); ctx.lineTo(mousePos.x, canvas.height);
