@@ -88,19 +88,22 @@ def _save_state_to(repo, count, version, runs):
         commit_message="state update",
     )
 
-def _append_history_to(repo, map50, count, run_number):
+def _append_history_to(repo, map50, count, run_number, image_stats=None):
     history = []
     try:
         p = hf_hub_download(repo, "history.json", repo_type="dataset", token=HF_TOKEN)
         history = json.loads(Path(p).read_text())
     except Exception:
         pass
-    history.append({
+    entry = {
         "timestamp": int(time.time()),
         "map50": map50,
         "annotation_count": count,
         "training_run": run_number,
-    })
+    }
+    if image_stats:
+        entry["images"] = image_stats
+    history.append(entry)
     api.upload_file(
         path_or_fileobj=json.dumps(history).encode(),
         path_in_repo="history.json",
@@ -283,7 +286,7 @@ def _retrain_world():
     _training_started_at = time.time()
     tmpdir = None
     try:
-        map50 = _run_training(
+        map50, image_stats = _run_training(
             dataset_repo=DATASET_REPO,
             model_repo=MODEL_REPO,
             base_weights_repo=MODEL_REPO,   # continue from own best.pt
@@ -291,7 +294,8 @@ def _retrain_world():
         )
         _model_version = str(int(time.time()))
         _training_run_count += 1
-        _append_history_to(DATASET_REPO, map50, _annotation_count, _training_run_count)
+        _append_history_to(DATASET_REPO, map50, _annotation_count, _training_run_count,
+                           image_stats=image_stats)
         _save_state_to(DATASET_REPO, _annotation_count, _model_version, _training_run_count)
     except Exception as e:
         print(f"[retrain world error] {e}")
@@ -311,7 +315,7 @@ def _retrain_team():
     _team_is_training = True
     _team_training_started_at = time.time()
     try:
-        map50 = _run_training(
+        map50, image_stats = _run_training(
             dataset_repo=TEAM_DATASET_REPO,
             model_repo=TEAM_MODEL_REPO,
             base_weights_repo=MODEL_REPO,   # always start from world best.pt
@@ -320,7 +324,8 @@ def _retrain_team():
         _team_model_version = str(int(time.time()))
         _team_training_run_count += 1
         _append_history_to(TEAM_DATASET_REPO, map50,
-                           _team_annotation_count, _team_training_run_count)
+                           _team_annotation_count, _team_training_run_count,
+                           image_stats=image_stats)
         _save_state_to(TEAM_DATASET_REPO, _team_annotation_count,
                        _team_model_version, _team_training_run_count)
     except Exception as e:
@@ -332,7 +337,7 @@ def _retrain_team():
 
 # ── Shared training logic ─────────────────────────────────────────────────────
 
-def _run_training(dataset_repo, model_repo, base_weights_repo, progress_dict) -> Optional[float]:
+def _run_training(dataset_repo, model_repo, base_weights_repo, progress_dict):
     from ultralytics import YOLO
 
     tmpdir = Path(tempfile.mkdtemp())
@@ -349,7 +354,7 @@ def _run_training(dataset_repo, model_repo, base_weights_repo, progress_dict) ->
 
         if not any(img_dir.iterdir()):
             print(f"[training] No images in {dataset_repo}, skipping")
-            return None
+            return None, []
 
         (tmpdir / "dataset.yaml").write_text(
             f"path: {tmpdir}\ntrain: images\nval: images\nnc: 1\nnames: ['ship']\n"
@@ -379,7 +384,7 @@ def _run_training(dataset_repo, model_repo, base_weights_repo, progress_dict) ->
 
         trained_pt = tmpdir / "train" / "weights" / "best.pt"
         if not trained_pt.exists():
-            return None
+            return None, []
 
         YOLO(str(trained_pt)).export(format="onnx", imgsz=640, simplify=True, opset=12)
         onnx_path = trained_pt.with_suffix(".onnx")
@@ -391,6 +396,23 @@ def _run_training(dataset_repo, model_repo, base_weights_repo, progress_dict) ->
             if rows:
                 try: map50 = float(rows[-1]["metrics/mAP50(B)"])
                 except Exception: pass
+
+        # Per-image predictions
+        image_stats = []
+        try:
+            preds = YOLO(str(trained_pt)).predict(
+                source=str(img_dir), imgsz=640, conf=0.01, verbose=False, save=False
+            )
+            for r in preds:
+                confs = r.boxes.conf.tolist() if r.boxes is not None and len(r.boxes) > 0 else []
+                image_stats.append({
+                    "name": Path(r.path).name,
+                    "detections": len(confs),
+                    "max_conf": round(max(confs), 3) if confs else 0.0,
+                    "avg_conf": round(sum(confs) / len(confs), 3) if confs else 0.0,
+                })
+        except Exception as e:
+            print(f"[per-image stats error] {e}")
 
         for local, remote in [(str(onnx_path), "model.onnx"), (str(trained_pt), "best.pt")]:
             api.upload_file(path_or_fileobj=local, path_in_repo=remote,
@@ -412,7 +434,7 @@ def _run_training(dataset_repo, model_repo, base_weights_repo, progress_dict) ->
                 except Exception:
                     pass
 
-        return map50
+        return map50, image_stats
 
     finally:
         shutil.rmtree(str(tmpdir), ignore_errors=True)
