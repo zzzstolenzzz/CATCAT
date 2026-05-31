@@ -218,7 +218,7 @@ function render(preview = null) {
   userBoxes.forEach(b => drawBox(b, '#ffd600'));
 
   if (preview) {
-    ctx.strokeStyle = '#ff9800';
+    ctx.strokeStyle = '#ff2020';
     ctx.lineWidth = 1.5;
     ctx.setLineDash([5, 4]);
     ctx.strokeRect(preview.x, preview.y, preview.w, preview.h);
