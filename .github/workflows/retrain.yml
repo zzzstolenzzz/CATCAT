@@ -35,32 +35,7 @@ jobs:
           EOF
 
       - name: Retrain YOLOv8
-        run: |
-          python - <<'EOF'
-          import os, sys
-          from pathlib import Path
-          from ultralytics import YOLO
-
-          data_dir = Path(os.getcwd()) / "data"
-          img_dir  = data_dir / "images"
-          images   = list(img_dir.glob("*")) if img_dir.exists() else []
-
-          print(f"data_dir : {data_dir}")
-          print(f"images   : {len(images)} files")
-
-          if not images:
-              print("No images found — skipping training.")
-              sys.exit(0)
-
-          yaml_path = data_dir / "dataset.yaml"
-          yaml_path.write_text(
-              f"path: {data_dir}\ntrain: images\nval: images\nnc: 1\nnames:\n- ship\n"
-          )
-          print(f"dataset.yaml:\n{yaml_path.read_text()}")
-
-          model = YOLO("yolov8n.pt")
-          model.train(data=str(yaml_path), epochs=10, imgsz=640, project="runs", name="ship")
-          EOF
+        run: python scripts/retrain.py
 
       - name: Export to ONNX
         run: python scripts/export_onnx.py --weights runs/ship/weights/best.pt
