@@ -224,10 +224,14 @@ async function fetchHistory() {
       const run = history.length - i;
       const map = h.map50 != null ? (h.map50 * 100).toFixed(1) + '%' : '—';
       const hasImages = h.images && h.images.length > 0;
+      const totalTime = h.total_seconds != null
+        ? (h.total_seconds >= 60 ? `${Math.floor(h.total_seconds/60)}m ${h.total_seconds%60}s` : `${h.total_seconds}s`)
+        : '—';
+      const epochTime = h.avg_epoch_s != null ? `${h.avg_epoch_s}s` : '—';
 
       const tr = document.createElement('tr');
       tr.className = hasImages ? 'run-row expandable' : 'run-row';
-      tr.innerHTML = `<td>${hasImages ? '<span class="expand-arrow">▶</span>' : ''}#${run}</td><td>${date}</td><td>${time}</td><td>${map}</td><td>${h.annotation_count ?? '—'}</td>`;
+      tr.innerHTML = `<td>${hasImages ? '<span class="expand-arrow">▶</span>' : ''}#${run}</td><td>${date}</td><td>${time}</td><td>${map}</td><td>${h.annotation_count ?? '—'}</td><td>${totalTime}</td><td>${epochTime}</td>`;
       tbody.appendChild(tr);
 
       if (hasImages) {

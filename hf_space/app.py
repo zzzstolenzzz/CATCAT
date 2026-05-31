@@ -88,7 +88,7 @@ def _save_state_to(repo, count, version, runs):
         commit_message="state update",
     )
 
-def _finalize_dataset(repo, images_to_delete, map50, image_stats, count, version, runs):
+def _finalize_dataset(repo, images_to_delete, map50, image_stats, count, version, runs, timing=None):
     """Delete training images, update history and state — all in one commit."""
     history = []
     try:
@@ -98,6 +98,8 @@ def _finalize_dataset(repo, images_to_delete, map50, image_stats, count, version
         pass
     entry = {"timestamp": int(time.time()), "map50": map50,
              "annotation_count": count, "training_run": runs}
+    if timing:
+        entry.update(timing)
     if image_stats:
         entry["images"] = image_stats
     history.append(entry)
@@ -289,7 +291,7 @@ def _retrain_world():
     _training_started_at = time.time()
     tmpdir = None
     try:
-        map50, image_stats, images_to_delete = _run_training(
+        map50, image_stats, images_to_delete, timing = _run_training(
             dataset_repo=DATASET_REPO,
             model_repo=MODEL_REPO,
             base_weights_repo=MODEL_REPO,
@@ -298,7 +300,7 @@ def _retrain_world():
         _model_version = str(int(time.time()))
         _training_run_count += 1
         _finalize_dataset(DATASET_REPO, images_to_delete, map50, image_stats,
-                          _annotation_count, _model_version, _training_run_count)
+                          _annotation_count, _model_version, _training_run_count, timing)
     except Exception as e:
         print(f"[retrain world error] {e}")
     finally:
@@ -317,7 +319,7 @@ def _retrain_team():
     _team_is_training = True
     _team_training_started_at = time.time()
     try:
-        map50, image_stats, images_to_delete = _run_training(
+        map50, image_stats, images_to_delete, timing = _run_training(
             dataset_repo=TEAM_DATASET_REPO,
             model_repo=TEAM_MODEL_REPO,
             base_weights_repo=MODEL_REPO,
@@ -326,7 +328,7 @@ def _retrain_team():
         _team_model_version = str(int(time.time()))
         _team_training_run_count += 1
         _finalize_dataset(TEAM_DATASET_REPO, images_to_delete, map50, image_stats,
-                          _team_annotation_count, _team_model_version, _team_training_run_count)
+                          _team_annotation_count, _team_model_version, _team_training_run_count, timing)
     except Exception as e:
         print(f"[retrain team error] {e}")
     finally:
@@ -353,7 +355,7 @@ def _run_training(dataset_repo, model_repo, base_weights_repo, progress_dict):
 
         if not any(img_dir.iterdir()):
             print(f"[training] No images in {dataset_repo}, skipping")
-            return None, [], []
+            return None, [], [], {}
 
         (tmpdir / "dataset.yaml").write_text(
             f"path: {tmpdir}\ntrain: images\nval: images\nnc: 1\nnames: ['ship']\n"
@@ -367,8 +369,15 @@ def _run_training(dataset_repo, model_repo, base_weights_repo, progress_dict):
 
         EPOCHS = 5
         progress_dict.update({"epoch": 0, "epochs": EPOCHS, "loss": None, "map50": None})
+        epoch_times = []
+        _epoch_start = [None]
+
+        def on_epoch_start(trainer):
+            _epoch_start[0] = time.time()
 
         def on_epoch_end(trainer):
+            if _epoch_start[0]:
+                epoch_times.append(round(time.time() - _epoch_start[0], 1))
             progress_dict.update({
                 "epoch": trainer.epoch + 1,
                 "epochs": trainer.epochs,
@@ -377,13 +386,16 @@ def _run_training(dataset_repo, model_repo, base_weights_repo, progress_dict):
             })
 
         model = YOLO(weights)
+        model.add_callback("on_train_epoch_start", on_epoch_start)
         model.add_callback("on_train_epoch_end", on_epoch_end)
+        train_start = time.time()
         model.train(data=str(tmpdir / "dataset.yaml"), epochs=EPOCHS,
                     imgsz=640, project=str(tmpdir), name="train", exist_ok=True)
+        total_seconds = round(time.time() - train_start)
 
         trained_pt = tmpdir / "train" / "weights" / "best.pt"
         if not trained_pt.exists():
-            return None, [], []
+            return None, [], [], {}
 
         YOLO(str(trained_pt)).export(format="onnx", imgsz=640, simplify=True, opset=12)
         onnx_path = trained_pt.with_suffix(".onnx")
@@ -428,7 +440,9 @@ def _run_training(dataset_repo, model_repo, base_weights_repo, progress_dict):
         images_to_delete = [f for f in api.list_repo_files(dataset_repo, repo_type="dataset")
                             if f.startswith("images/")]
 
-        return map50, image_stats, images_to_delete
+        avg_epoch_s = round(sum(epoch_times) / len(epoch_times), 1) if epoch_times else None
+        timing = {"total_seconds": total_seconds, "avg_epoch_s": avg_epoch_s}
+        return map50, image_stats, images_to_delete, timing
 
     finally:
         shutil.rmtree(str(tmpdir), ignore_errors=True)
