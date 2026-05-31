@@ -70,7 +70,8 @@ async function initModel() {
   try {
     ort.env.wasm.wasmPaths = 'https://cdn.jsdelivr.net/npm/onnxruntime-web@1.18.0/dist/';
     ort.env.wasm.numThreads = 1; // GitHub Pages lacks cross-origin isolation for multi-threading
-    ortSession = await ort.InferenceSession.create(CONFIG.modelUrl, {
+    const modelUrl = CONFIG.teamModelUrl || CONFIG.modelUrl;
+    ortSession = await ort.InferenceSession.create(modelUrl, {
       executionProviders: ['wasm'],
     });
     modelStatusEl.textContent = 'Model ready';
@@ -406,11 +407,13 @@ async function submitAnnotation(imageName, boxes, imageFile) {
     fd.append('boxes', JSON.stringify(boxes));
     fd.append('image_name', imageName);
 
-    const resp = await fetch(`${CONFIG.backendUrl}/annotate`, { method: 'POST', body: fd });
+    const resp = await fetch(`${CONFIG.backendUrl}/team/annotate`, {
+      method: 'POST', body: fd, headers: { 'X-Team-Key': CONFIG.teamKey },
+    });
     if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
     const data = await resp.json();
     const trainingNote = data.training ? ' · training started…' : '';
-    setStatus(`Saved — ${data.total_annotations} annotations${trainingNote}`);
+    setStatus(`Saved — ${data.total_annotations} team annotations${trainingNote}`);
     if (data.map50 != null) updateMap(data.map50);
     if (data.model_version) currentModelVersion = data.model_version;
   } catch (e) {
@@ -429,7 +432,8 @@ function updateMap(map50) {
 // --- Fetch live stats on load ---
 async function fetchStats() {
   try {
-    const data = await (await fetch(`${CONFIG.backendUrl}/stats`)).json();
+    const data = await (await fetch(`${CONFIG.backendUrl}/team/stats`,
+      { headers: { 'X-Team-Key': CONFIG.teamKey } })).json();
     if (data.map50 != null) updateMap(data.map50);
   } catch (_) {}
 }
