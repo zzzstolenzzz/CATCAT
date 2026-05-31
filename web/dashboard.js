@@ -46,27 +46,6 @@ const mapChart = new Chart(mapCtx, {
   },
 });
 
-const runCtx = document.getElementById('run-chart').getContext('2d');
-const runChart = new Chart(runCtx, {
-  type: 'bar',
-  data: { labels: [], datasets: [{
-    label: 'Annotations',
-    data: [],
-    backgroundColor: 'rgba(167,139,250,0.6)',
-    borderColor: '#a78bfa',
-    borderWidth: 1,
-    borderRadius: 4,
-  }]},
-  options: {
-    responsive: true, maintainAspectRatio: false,
-    plugins: { legend: { display: false } },
-    scales: {
-      x: { grid: { display: false } },
-      y: { grid: { color: 'rgba(255,255,255,0.05)' }, beginAtZero: true, ticks: { precision: 0 } },
-    },
-    animation: { duration: 600 },
-  },
-});
 
 // ── DOM refs ───────────────────────────────────────────────────────────────────
 
@@ -232,11 +211,20 @@ async function fetchHistory() {
     mapChart.data.datasets[0].data = history.map(h => h.map50 ?? 0);
     mapChart.update();
 
-    runChart.data.labels = history.map((_, i) => `Run ${i + 1}`);
-    runChart.data.datasets[0].data = history.map(h => h.annotation_count ?? 0);
-    runChart.update();
+    // Group runs by date and populate table
+    const tbody = els('runs-tbody');
+    tbody.innerHTML = '';
+    [...history].reverse().forEach((h, i) => {
+      const d = new Date(h.timestamp * 1000);
+      const date = d.toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' });
+      const time = d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      const run = history.length - i;
+      const map = h.map50 != null ? (h.map50 * 100).toFixed(1) + '%' : '—';
+      const tr = document.createElement('tr');
+      tr.innerHTML = `<td>#${run}</td><td>${date}</td><td>${time}</td><td>${map}</td><td>${h.annotation_count ?? '—'}</td>`;
+      tbody.appendChild(tr);
+    });
 
-    // Update map badge with latest
     const latest = history[history.length - 1];
     if (latest?.map50 != null) {
       els('map-badge').textContent = `mAP50 · ${(latest.map50 * 100).toFixed(1)}%`;
