@@ -246,7 +246,9 @@ document.querySelectorAll('.tip').forEach(el => {
     let left = r.left + r.width / 2 - tipW / 2;
     left = Math.max(8, Math.min(left, window.innerWidth - tipW - 8));
     globalTip.style.left = left + 'px';
-    globalTip.style.top = (r.top - globalTip.offsetHeight - 10) + 'px';
+    const tipH = globalTip.offsetHeight || 60;
+    const above = r.top - tipH - 10;
+    globalTip.style.top = above >= 8 ? above + 'px' : (r.bottom + 10) + 'px';
   });
   el.addEventListener('mouseleave', () => { globalTip.style.display = 'none'; });
 });
