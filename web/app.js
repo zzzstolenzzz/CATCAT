@@ -70,10 +70,16 @@ async function initModel() {
   try {
     ort.env.wasm.wasmPaths = 'https://cdn.jsdelivr.net/npm/onnxruntime-web@1.18.0/dist/';
     ort.env.wasm.numThreads = 1; // GitHub Pages lacks cross-origin isolation for multi-threading
-    const modelUrl = CONFIG.teamModelUrl || CONFIG.modelUrl;
-    ortSession = await ort.InferenceSession.create(modelUrl, {
-      executionProviders: ['wasm'],
-    });
+    const urls = [CONFIG.teamModelUrl, CONFIG.modelUrl].filter(Boolean);
+    let lastErr;
+    for (const url of urls) {
+      try {
+        ortSession = await ort.InferenceSession.create(url, { executionProviders: ['wasm'] });
+        lastErr = null;
+        break;
+      } catch (e) { lastErr = e; }
+    }
+    if (lastErr) throw lastErr;
     modelStatusEl.textContent = 'Model ready';
     modelStatusEl.className = 'ready';
     setStatus('Ready');
