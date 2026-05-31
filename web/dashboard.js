@@ -115,7 +115,9 @@ function updateEngine(stats) {
   const pct = Math.min(queue / every, 1);
 
   const remaining = Math.max(0, every - queue);
-  els('eng-next').textContent = remaining === 0 ? `Ready (${queue} queued)` : `${remaining} more needed`;
+  els('eng-next').textContent = stats.training
+    ? `Currently training ${queue} images`
+    : remaining === 0 ? `Ready (${queue} queued)` : `${remaining} more needed`;
   els('eng-every').textContent = `${every} annotations`;
 
   const mv = stats.model_version;
