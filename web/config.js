@@ -8,7 +8,7 @@ window.CATCAT_CONFIG = {
   backendUrl: 'https://davemost-catcat-backend.hf.space',
 
   // Shared team key — all team members use the same value here
-  teamKey: 'REPLACE_WITH_YOUR_TEAM_KEY',
+  teamKey: 'choquette',
 
   confThreshold: 0.05,
   iouThreshold:  0.45,
