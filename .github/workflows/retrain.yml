@@ -31,11 +31,16 @@ jobs:
               repo_type="dataset",
               local_dir="data",
               token=os.environ["HF_TOKEN"],
+              ignore_patterns=["*.yaml", "*.json"],
           )
           EOF
 
       - name: Retrain YOLOv8
-        run: python scripts/retrain.py
+        run: |
+          echo "=== Step: Retrain YOLOv8 ==="
+          echo "dataset.yaml before script:"
+          cat data/dataset.yaml || echo "(not found)"
+          python scripts/retrain.py
 
       - name: Export to ONNX
         run: python scripts/export_onnx.py --weights runs/ship/weights/best.pt
