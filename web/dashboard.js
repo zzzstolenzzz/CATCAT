@@ -180,9 +180,11 @@ setInterval(() => {
   if (ringDetail) ringDetail.textContent = detail;
 }, 1000);
 
+const TEAM_HEADERS = { 'X-Team-Key': window.CATCAT_CONFIG.teamKey };
+
 async function fetchStats() {
   try {
-    const data = await (await fetch(`${API}/stats`)).json();
+    const data = await (await fetch(`${API}/team/stats`, { headers: TEAM_HEADERS })).json();
     lastStats = data;
 
     animateTo('stat-annotations', data.total_annotations ?? 0);
@@ -214,7 +216,7 @@ async function fetchStats() {
 
 async function fetchHistory() {
   try {
-    const history = await (await fetch(`${API}/history`)).json();
+    const history = await (await fetch(`${API}/team/history`, { headers: TEAM_HEADERS })).json();
     if (!history.length) return;
 
     els('map-empty').classList.add('hidden');
