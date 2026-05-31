@@ -236,7 +236,7 @@ async function fetchHistory() {
         const imgRows = h.images.map(img =>
           `<tr><td>${img.name}</td><td>${img.detections}</td><td>${img.max_conf > 0 ? (img.max_conf * 100).toFixed(1) + '%' : '—'}</td><td>${img.avg_conf > 0 ? (img.avg_conf * 100).toFixed(1) + '%' : '—'}</td></tr>`
         ).join('');
-        detail.innerHTML = `<td colspan="5"><div class="run-detail-inner"><table class="img-table"><thead><tr><th>Image</th><th>Detections</th><th>Max Conf</th><th>Avg Conf</th></tr></thead><tbody>${imgRows}</tbody></table></div></td>`;
+        detail.innerHTML = `<td colspan="5"><div class="run-detail-inner"><table class="img-table"><thead><tr><th>Image</th><th>Detections<span class="tip" data-tip="Number of ships the model found in this image.">?</span></th><th>Max Conf<span class="tip" data-tip="Highest confidence score among all detections. 100% = the model is certain it's a ship.">?</span></th><th>Avg Conf<span class="tip" data-tip="Average confidence across all detections in this image.">?</span></th></tr></thead><tbody>${imgRows}</tbody></table></div></td>`;
         tbody.appendChild(detail);
 
         tr.addEventListener('click', () => {
@@ -259,20 +259,22 @@ async function fetchHistory() {
 // ── Global tooltips ───────────────────────────────────────────────────────────
 const globalTip = document.getElementById('global-tip');
 
-document.querySelectorAll('.tip').forEach(el => {
-  el.addEventListener('mouseenter', () => {
-    const r = el.getBoundingClientRect();
-    globalTip.textContent = el.dataset.tip;
-    globalTip.style.display = 'block';
-    const tipW = 210;
-    let left = r.left + r.width / 2 - tipW / 2;
-    left = Math.max(8, Math.min(left, window.innerWidth - tipW - 8));
-    globalTip.style.left = left + 'px';
-    const tipH = globalTip.offsetHeight || 60;
-    const above = r.top - tipH - 10;
-    globalTip.style.top = above >= 8 ? above + 'px' : (r.bottom + 10) + 'px';
-  });
-  el.addEventListener('mouseleave', () => { globalTip.style.display = 'none'; });
+document.addEventListener('mouseover', e => {
+  const el = e.target.closest('.tip');
+  if (!el) return;
+  const r = el.getBoundingClientRect();
+  globalTip.textContent = el.dataset.tip;
+  globalTip.style.display = 'block';
+  const tipW = 210;
+  let left = r.left + r.width / 2 - tipW / 2;
+  left = Math.max(8, Math.min(left, window.innerWidth - tipW - 8));
+  globalTip.style.left = left + 'px';
+  const tipH = globalTip.offsetHeight || 60;
+  const above = r.top - tipH - 10;
+  globalTip.style.top = above >= 8 ? above + 'px' : (r.bottom + 10) + 'px';
+});
+document.addEventListener('mouseout', e => {
+  if (e.target.closest('.tip')) globalTip.style.display = 'none';
 });
 
 // ── Boot ──────────────────────────────────────────────────────────────────────
