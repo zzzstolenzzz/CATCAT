@@ -19,7 +19,7 @@ import os, json, threading, tempfile, shutil, time, csv
 from pathlib import Path
 from fastapi import FastAPI, Form, UploadFile, File, HTTPException, Header
 from fastapi.middleware.cors import CORSMiddleware
-from huggingface_hub import HfApi, hf_hub_download, snapshot_download, CommitOperationAdd
+from huggingface_hub import HfApi, hf_hub_download, snapshot_download, CommitOperationAdd, CommitOperationDelete
 from typing import Optional
 
 app = FastAPI()
@@ -88,28 +88,30 @@ def _save_state_to(repo, count, version, runs):
         commit_message="state update",
     )
 
-def _append_history_to(repo, map50, count, run_number, image_stats=None):
+def _finalize_dataset(repo, images_to_delete, map50, image_stats, count, version, runs):
+    """Delete training images, update history and state — all in one commit."""
     history = []
     try:
         p = hf_hub_download(repo, "history.json", repo_type="dataset", token=HF_TOKEN)
         history = json.loads(Path(p).read_text())
     except Exception:
         pass
-    entry = {
-        "timestamp": int(time.time()),
-        "map50": map50,
-        "annotation_count": count,
-        "training_run": run_number,
-    }
+    entry = {"timestamp": int(time.time()), "map50": map50,
+             "annotation_count": count, "training_run": runs}
     if image_stats:
         entry["images"] = image_stats
     history.append(entry)
-    api.upload_file(
-        path_or_fileobj=json.dumps(history).encode(),
-        path_in_repo="history.json",
-        repo_id=repo, repo_type="dataset",
-        commit_message="history update",
-    )
+    ops = [CommitOperationDelete(f) for f in images_to_delete]
+    ops.append(CommitOperationAdd(path_in_repo="history.json",
+                                  path_or_fileobj=json.dumps(history).encode()))
+    ops.append(CommitOperationAdd(path_in_repo="state.json",
+                                  path_or_fileobj=json.dumps({
+                                      "annotation_count": count,
+                                      "model_version": version,
+                                      "training_run_count": runs,
+                                  }).encode()))
+    api.create_commit(repo_id=repo, repo_type="dataset", token=HF_TOKEN,
+                      commit_message="retrain complete", operations=ops)
 
 def _images_in_queue_for(repo) -> int:
     try:
@@ -287,17 +289,16 @@ def _retrain_world():
     _training_started_at = time.time()
     tmpdir = None
     try:
-        map50, image_stats = _run_training(
+        map50, image_stats, images_to_delete = _run_training(
             dataset_repo=DATASET_REPO,
             model_repo=MODEL_REPO,
-            base_weights_repo=MODEL_REPO,   # continue from own best.pt
+            base_weights_repo=MODEL_REPO,
             progress_dict=_training_progress,
         )
         _model_version = str(int(time.time()))
         _training_run_count += 1
-        _append_history_to(DATASET_REPO, map50, _annotation_count, _training_run_count,
-                           image_stats=image_stats)
-        _save_state_to(DATASET_REPO, _annotation_count, _model_version, _training_run_count)
+        _finalize_dataset(DATASET_REPO, images_to_delete, map50, image_stats,
+                          _annotation_count, _model_version, _training_run_count)
     except Exception as e:
         print(f"[retrain world error] {e}")
     finally:
@@ -316,19 +317,16 @@ def _retrain_team():
     _team_is_training = True
     _team_training_started_at = time.time()
     try:
-        map50, image_stats = _run_training(
+        map50, image_stats, images_to_delete = _run_training(
             dataset_repo=TEAM_DATASET_REPO,
             model_repo=TEAM_MODEL_REPO,
-            base_weights_repo=MODEL_REPO,   # always start from world best.pt
+            base_weights_repo=MODEL_REPO,
             progress_dict=_team_training_progress,
         )
         _team_model_version = str(int(time.time()))
         _team_training_run_count += 1
-        _append_history_to(TEAM_DATASET_REPO, map50,
-                           _team_annotation_count, _team_training_run_count,
-                           image_stats=image_stats)
-        _save_state_to(TEAM_DATASET_REPO, _team_annotation_count,
-                       _team_model_version, _team_training_run_count)
+        _finalize_dataset(TEAM_DATASET_REPO, images_to_delete, map50, image_stats,
+                          _team_annotation_count, _team_model_version, _team_training_run_count)
     except Exception as e:
         print(f"[retrain team error] {e}")
     finally:
@@ -355,7 +353,7 @@ def _run_training(dataset_repo, model_repo, base_weights_repo, progress_dict):
 
         if not any(img_dir.iterdir()):
             print(f"[training] No images in {dataset_repo}, skipping")
-            return None, []
+            return None, [], []
 
         (tmpdir / "dataset.yaml").write_text(
             f"path: {tmpdir}\ntrain: images\nval: images\nnc: 1\nnames: ['ship']\n"
@@ -385,7 +383,7 @@ def _run_training(dataset_repo, model_repo, base_weights_repo, progress_dict):
 
         trained_pt = tmpdir / "train" / "weights" / "best.pt"
         if not trained_pt.exists():
-            return None, []
+            return None, [], []
 
         YOLO(str(trained_pt)).export(format="onnx", imgsz=640, simplify=True, opset=12)
         onnx_path = trained_pt.with_suffix(".onnx")
@@ -415,27 +413,22 @@ def _run_training(dataset_repo, model_repo, base_weights_repo, progress_dict):
         except Exception as e:
             print(f"[per-image stats error] {e}")
 
-        for local, remote in [(str(onnx_path), "model.onnx"), (str(trained_pt), "best.pt")]:
-            api.upload_file(path_or_fileobj=local, path_in_repo=remote,
-                            repo_id=model_repo, repo_type="model",
-                            commit_message=f"retrain: {remote}")
+        # Batch model files into one commit
+        model_ops = [
+            CommitOperationAdd(path_in_repo="model.onnx", path_or_fileobj=onnx_path.read_bytes()),
+            CommitOperationAdd(path_in_repo="best.pt",    path_or_fileobj=trained_pt.read_bytes()),
+        ]
         if map50 is not None:
-            api.upload_file(
-                path_or_fileobj=json.dumps({"map50": map50}).encode(),
-                path_in_repo="metrics.json", repo_id=model_repo, repo_type="model",
-                commit_message="retrain: metrics",
-            )
+            model_ops.append(CommitOperationAdd(path_in_repo="metrics.json",
+                                                path_or_fileobj=json.dumps({"map50": map50}).encode()))
+        api.create_commit(repo_id=model_repo, repo_type="model", token=HF_TOKEN,
+                          commit_message="retrain: model", operations=model_ops)
 
-        # Delete images (keep labels)
-        for f in api.list_repo_files(dataset_repo, repo_type="dataset"):
-            if f.startswith("images/"):
-                try:
-                    api.delete_file(path_in_repo=f, repo_id=dataset_repo,
-                                    repo_type="dataset", commit_message=f"cleanup: {f}")
-                except Exception:
-                    pass
+        # Collect images to delete (caller batches with history+state in one commit)
+        images_to_delete = [f for f in api.list_repo_files(dataset_repo, repo_type="dataset")
+                            if f.startswith("images/")]
 
-        return map50, image_stats
+        return map50, image_stats, images_to_delete
 
     finally:
         shutil.rmtree(str(tmpdir), ignore_errors=True)
