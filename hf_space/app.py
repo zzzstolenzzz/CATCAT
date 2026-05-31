@@ -19,7 +19,7 @@ import os, json, threading, tempfile, shutil, time, csv
 from pathlib import Path
 from fastapi import FastAPI, Form, UploadFile, File, HTTPException, Header
 from fastapi.middleware.cors import CORSMiddleware
-from huggingface_hub import HfApi, hf_hub_download, snapshot_download
+from huggingface_hub import HfApi, hf_hub_download, snapshot_download, CommitOperationAdd
 from typing import Optional
 
 app = FastAPI()
@@ -125,18 +125,19 @@ def _get_map50_from(repo, repo_type="model") -> Optional[float]:
     except Exception:
         return None
 
-def _upload_image_and_label(image_bytes, boxes_json, stem, ext, dataset_repo):
-    api.upload_file(
-        path_or_fileobj=image_bytes,
-        path_in_repo=f"images/{stem}.{ext}",
+def _upload_annotation(image_bytes, boxes_json, stem, ext, dataset_repo, state: dict):
+    """Upload image, label, and state in a single commit to avoid rate limits."""
+    api.create_commit(
         repo_id=dataset_repo, repo_type="dataset",
-        commit_message=f"image: {stem}.{ext}",
-    )
-    api.upload_file(
-        path_or_fileobj="\n".join(to_yolo(b) for b in boxes_json).encode(),
-        path_in_repo=f"labels/{stem}.txt",
-        repo_id=dataset_repo, repo_type="dataset",
-        commit_message=f"label: {stem}",
+        commit_message=f"annotate: {stem}",
+        operations=[
+            CommitOperationAdd(path_in_repo=f"images/{stem}.{ext}", path_or_fileobj=image_bytes),
+            CommitOperationAdd(path_in_repo=f"labels/{stem}.txt",
+                               path_or_fileobj="\n".join(to_yolo(b) for b in boxes_json).encode()),
+            CommitOperationAdd(path_in_repo="state.json",
+                               path_or_fileobj=json.dumps(state).encode()),
+        ],
+        token=HF_TOKEN,
     )
 
 def _check_team_key(key: Optional[str]):
@@ -181,10 +182,10 @@ async def annotate(
 
     stem = image_name.rsplit(".", 1)[0]
     ext  = image_name.rsplit(".", 1)[-1] if "." in image_name else "jpg"
-    _upload_image_and_label(await image.read(), json.loads(boxes), stem, ext, DATASET_REPO)
-
     _annotation_count += 1
-    _save_state_to(DATASET_REPO, _annotation_count, _model_version, _training_run_count)
+    _upload_annotation(await image.read(), json.loads(boxes), stem, ext, DATASET_REPO,
+                       {"annotation_count": _annotation_count, "model_version": _model_version,
+                        "training_run_count": _training_run_count})
 
     if _annotation_count % TRAIN_EVERY == 0 and not _is_training:
         threading.Thread(target=_retrain_world, daemon=True).start()
@@ -234,11 +235,11 @@ async def team_annotate(
 
     stem = image_name.rsplit(".", 1)[0]
     ext  = image_name.rsplit(".", 1)[-1] if "." in image_name else "jpg"
-    _upload_image_and_label(await image.read(), json.loads(boxes), stem, ext, TEAM_DATASET_REPO)
-
     _team_annotation_count += 1
-    _save_state_to(TEAM_DATASET_REPO, _team_annotation_count,
-                   _team_model_version, _team_training_run_count)
+    _upload_annotation(await image.read(), json.loads(boxes), stem, ext, TEAM_DATASET_REPO,
+                       {"annotation_count": _team_annotation_count,
+                        "model_version": _team_model_version,
+                        "training_run_count": _team_training_run_count})
 
     if _team_annotation_count % TRAIN_EVERY == 0 and not _team_is_training:
         threading.Thread(target=_retrain_team, daemon=True).start()
