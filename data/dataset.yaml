@@ -1,6 +1,6 @@
-names:
-- ship
-nc: 1
-path: C:\Repos\REAGAN\data
+path: .
 train: images
 val: images
+nc: 1
+names:
+- ship
