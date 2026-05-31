@@ -117,10 +117,13 @@
 
       <div class="panel chart-panel">
         <div class="panel-header">
-          <span class="panel-title">Annotations per Training Run</span>
+          <span class="panel-title">Training Runs</span>
         </div>
-        <div class="chart-wrap">
-          <canvas id="run-chart"></canvas>
+        <div class="runs-wrap">
+          <table class="runs-table" id="runs-table">
+            <thead><tr><th>#</th><th>Date</th><th>Time</th><th>mAP50</th><th>Annotations</th></tr></thead>
+            <tbody id="runs-tbody"></tbody>
+          </table>
           <div class="chart-empty" id="run-empty">No training runs yet</div>
         </div>
       </div>

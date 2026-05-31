@@ -180,6 +180,18 @@ header {
 }
 .chart-empty.hidden { display: none; }
 
+/* ── Runs table ──────────────────────────────────────────────── */
+.runs-wrap { position: relative; min-height: 120px; overflow-y: auto; max-height: 220px; }
+.runs-table { width: 100%; border-collapse: collapse; font-size: 0.82rem; }
+.runs-table th {
+  text-align: left; padding: 6px 10px;
+  color: var(--dim); font-weight: 500; border-bottom: 1px solid var(--border);
+  position: sticky; top: 0; background: var(--surf);
+}
+.runs-table td { padding: 6px 10px; border-bottom: 1px solid rgba(255,255,255,0.04); }
+.runs-table tr:last-child td { border-bottom: none; }
+.runs-table tr:hover td { background: rgba(255,255,255,0.03); }
+
 /* ── Training engine ─────────────────────────────────────────── */
 .engine-body { display: flex; gap: 20px; align-items: center; }
 
