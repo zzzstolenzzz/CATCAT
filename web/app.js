@@ -212,9 +212,14 @@ function render(preview = null) {
   imageCtx.drawImage(currentImageEl, canvasOffsetX, canvasOffsetY, imgDisplayW, imgDisplayH);
   ctx.clearRect(0, 0, canvas.width, canvas.height);
 
+  const imgLeft   = canvasOffsetX;
+  const imgTop    = canvasOffsetY;
+  const imgRight  = canvasOffsetX + imgDisplayW;
+  const imgBottom = canvasOffsetY + imgDisplayH;
+
   const drawBox = (b, color) => {
-    const bx = canvasOffsetX + b.x1 * imgDisplayW;
-    const by = canvasOffsetY + b.y1 * imgDisplayH;
+    const bx = imgLeft + b.x1 * imgDisplayW;
+    const by = imgTop  + b.y1 * imgDisplayH;
     const bw = (b.x2 - b.x1) * imgDisplayW;
     const bh = (b.y2 - b.y1) * imgDisplayH;
     ctx.strokeStyle = color;
@@ -222,11 +227,16 @@ function render(preview = null) {
     ctx.setLineDash([]);
     ctx.strokeRect(bx, by, bw, bh);
 
+    // Dotted expansion box, clamped to image bounds
     const pad = 2 * 96; // 2 inches at 96 CSS px/inch
+    const dx1 = Math.max(imgLeft,   bx - pad);
+    const dy1 = Math.max(imgTop,    by - pad);
+    const dx2 = Math.min(imgRight,  bx + bw + pad);
+    const dy2 = Math.min(imgBottom, by + bh + pad);
     ctx.strokeStyle = color;
     ctx.lineWidth = 1.5;
     ctx.setLineDash([6, 4]);
-    ctx.strokeRect(bx - pad, by - pad, bw + pad * 2, bh + pad * 2);
+    ctx.strokeRect(dx1, dy1, dx2 - dx1, dy2 - dy1);
     ctx.setLineDash([]);
   };
 
@@ -249,6 +259,62 @@ function render(preview = null) {
     ctx.moveTo(0, mousePos.y); ctx.lineTo(canvas.width, mousePos.y);
     ctx.stroke();
   }
+
+  drawRulers(imgLeft, imgTop, imgDisplayW, imgDisplayH);
+}
+
+function drawRulers(imgLeft, imgTop, imgW, imgH) {
+  const INCH = 96;  // CSS px per inch at standard 96 dpi
+  const SZ   = 24;  // ruler strip thickness in px
+
+  ctx.save();
+
+  // Background strips
+  ctx.fillStyle = 'rgba(0,0,0,0.55)';
+  ctx.fillRect(imgLeft, imgTop, imgW, SZ);       // top
+  ctx.fillRect(imgLeft, imgTop, SZ, imgH);       // left
+
+  ctx.strokeStyle = 'rgba(255,255,255,0.75)';
+  ctx.fillStyle   = 'rgba(255,255,255,0.85)';
+  ctx.lineWidth   = 1;
+
+  // Top ruler — baseline along bottom edge of strip
+  const topBase = imgTop + SZ;
+  ctx.font = '9px monospace';
+  ctx.textBaseline = 'top';
+  for (let px = 0; px <= imgW; px += INCH / 2) {
+    const isMajor = px % INCH === 0;
+    const x = imgLeft + px;
+    const tickH = isMajor ? SZ - 2 : (SZ - 2) * 0.45;
+    ctx.beginPath();
+    ctx.moveTo(x + 0.5, topBase);
+    ctx.lineTo(x + 0.5, topBase - tickH);
+    ctx.stroke();
+    if (isMajor && px > 0) ctx.fillText(`${px / INCH}"`, x + 2, imgTop + 2);
+  }
+
+  // Left ruler — baseline along right edge of strip
+  const leftBase = imgLeft + SZ;
+  ctx.textBaseline = 'middle';
+  for (let py = INCH; py <= imgH; py += INCH / 2) {
+    const isMajor = py % INCH === 0;
+    const y = imgTop + py;
+    const tickW = isMajor ? SZ - 2 : (SZ - 2) * 0.45;
+    ctx.beginPath();
+    ctx.moveTo(leftBase, y + 0.5);
+    ctx.lineTo(leftBase - tickW, y + 0.5);
+    ctx.stroke();
+    if (isMajor) {
+      ctx.save();
+      ctx.translate(imgLeft + 2, y);
+      ctx.rotate(-Math.PI / 2);
+      const label = `${py / INCH}"`;
+      ctx.fillText(label, -ctx.measureText(label).width / 2, 0);
+      ctx.restore();
+    }
+  }
+
+  ctx.restore();
 }
 
 // --- Canvas → normalized image coords ---
