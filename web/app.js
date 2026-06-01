@@ -371,7 +371,31 @@ canvas.addEventListener('mouseup', e => {
 });
 
 // --- Image loading ---
-loadBtn.addEventListener('click', () => fileInput.click());
+loadBtn.addEventListener('click', async () => {
+  if (window.showDirectoryPicker) {
+    try {
+      _dirHandle = await window.showDirectoryPicker({ mode: 'readwrite' });
+    } catch (e) {
+      if (e.name !== 'AbortError') setStatus(`Folder error: ${e.message}`, 'status-err');
+      return;
+    }
+    const found = [];
+    for await (const [name, handle] of _dirHandle.entries()) {
+      if (handle.kind !== 'file') continue;
+      if (!/\.(jpe?g|png|webp|tiff?|bmp)$/i.test(name)) continue;
+      found.push({ file: await handle.getFile(), name });
+    }
+    found.sort((a, b) => a.name.localeCompare(b.name));
+    if (!found.length) { setStatus('No images found in that folder', 'status-err'); return; }
+    images = found;
+    currentIndex = 0;
+    hint.style.display = 'none';
+    await loadCurrentImage();
+  } else {
+    fileInput.click();
+  }
+});
+
 fileInput.addEventListener('change', async e => {
   const files = Array.from(e.target.files);
   if (!files.length) return;
@@ -459,20 +483,7 @@ async function accept() {
 }
 
 async function saveProcessed(boxes) {
-  if (!window.showDirectoryPicker) {
-    setStatus('Local save requires a Chromium-based browser', 'status-err');
-    return;
-  }
-
-  // Prompt for folder on first save (must be called within a user gesture)
-  if (!_dirHandle) {
-    try {
-      _dirHandle = await window.showDirectoryPicker({ mode: 'readwrite' });
-    } catch (e) {
-      if (e.name !== 'AbortError') setStatus(`Folder error: ${e.message}`, 'status-err');
-      return;
-    }
-  }
+  if (!_dirHandle) return; // no folder access — loaded via file picker fallback
 
   // Compute crop: union of all box bounds + 1-inch pad, clamped to image
   const padNX = 96 / imgDisplayW;
