@@ -536,7 +536,8 @@ function advance() {
     currentIndex++;
     loadCurrentImage();
   } else {
-    setStatus('All images reviewed. Great work!');
+    statusEl.textContent = 'All done!';
+    statusEl.className = 'status-done';
     acceptBtn.disabled = true;
     skipBtn.disabled = true;
   }

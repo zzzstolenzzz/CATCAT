@@ -250,8 +250,9 @@ button:disabled { opacity: 0.35; cursor: default; }
   font-size: 0.78rem;
   color: var(--text-dim);
 }
-#status-text.status-ok  { color: #00e87a; font-weight: 600; }
-#status-text.status-err { color: #ff4444; font-weight: 600; }
+#status-text.status-ok   { color: #00e87a; font-weight: 600; }
+#status-text.status-err  { color: #ff4444; font-weight: 600; }
+#status-text.status-done { color: #00e87a; font-weight: 700; font-size: 1.05em; }
 
 /* ── Modern: bigger, bolder text ── */
 [data-theme="modern"] button { font-size: 0.92rem; font-weight: 500; letter-spacing: 0.02em; }
