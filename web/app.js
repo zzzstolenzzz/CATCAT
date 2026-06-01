@@ -18,6 +18,8 @@ let mousePos = null;
 let canvasOffsetX = 0, canvasOffsetY = 0;
 let imgDisplayW = 0, imgDisplayH = 0;
 
+let _dirHandle = null; // FileSystemDirectoryHandle for local saves
+
 const RULER_SZ = 28; // px reserved for rulers on top and left
 
 // --- DOM refs ---
@@ -449,8 +451,73 @@ async function accept() {
   sessionEl.textContent = `Session: ${sessionCount}`;
 
   const corrected = userBoxes.length > 0;
-  if (boxes.length > 0) await submitAnnotation(images[currentIndex].name, boxes, images[currentIndex].file, corrected);
+  if (boxes.length > 0) {
+    await saveProcessed(boxes);
+    await submitAnnotation(images[currentIndex].name, boxes, images[currentIndex].file, corrected);
+  }
   advance();
+}
+
+async function saveProcessed(boxes) {
+  if (!window.showDirectoryPicker) {
+    setStatus('Local save requires a Chromium-based browser', 'status-err');
+    return;
+  }
+
+  // Prompt for folder on first save (must be called within a user gesture)
+  if (!_dirHandle) {
+    try {
+      _dirHandle = await window.showDirectoryPicker({ mode: 'readwrite' });
+    } catch (e) {
+      if (e.name !== 'AbortError') setStatus(`Folder error: ${e.message}`, 'status-err');
+      return;
+    }
+  }
+
+  // Compute crop: union of all box bounds + 1-inch pad, clamped to image
+  const padNX = 96 / imgDisplayW;
+  const padNY = 96 / imgDisplayH;
+  let x1 = 1, y1 = 1, x2 = 0, y2 = 0;
+  for (const b of boxes) {
+    x1 = Math.min(x1, b.x1); y1 = Math.min(y1, b.y1);
+    x2 = Math.max(x2, b.x2); y2 = Math.max(y2, b.y2);
+  }
+  const nx1 = Math.max(0, x1 - padNX), ny1 = Math.max(0, y1 - padNY);
+  const nx2 = Math.min(1, x2 + padNX), ny2 = Math.min(1, y2 + padNY);
+
+  const srcX = Math.round(nx1 * currentImageEl.naturalWidth);
+  const srcY = Math.round(ny1 * currentImageEl.naturalHeight);
+  const srcW = Math.round((nx2 - nx1) * currentImageEl.naturalWidth);
+  const srcH = Math.round((ny2 - ny1) * currentImageEl.naturalHeight);
+
+  const off = document.createElement('canvas');
+  off.width = srcW; off.height = srcH;
+  off.getContext('2d').drawImage(currentImageEl, srcX, srcY, srcW, srcH, 0, 0, srcW, srcH);
+
+  // Encode JPEG, stepping quality down until under 2.5 MB
+  const MAX = 2.5 * 1024 * 1024;
+  let quality = 0.92, blob;
+  do {
+    blob = await new Promise(r => off.toBlob(r, 'image/jpeg', quality));
+    quality = Math.max(0.1, quality - 0.1);
+  } while (blob.size > MAX && quality > 0.1);
+
+  try {
+    const procDir = await _dirHandle.getDirectoryHandle('Processed', { create: true });
+    const imgName = images[currentIndex].name;
+    const dot  = imgName.lastIndexOf('.');
+    const base = dot > 0 ? imgName.slice(0, dot) : imgName;
+    const ext  = dot > 0 ? imgName.slice(dot)    : '.jpg';
+    const outName = base + '_processed' + ext;
+    const fh = await procDir.getFileHandle(outName, { create: true });
+    const writable = await fh.createWritable();
+    await writable.write(blob);
+    await writable.close();
+    setStatus(`Saved ${outName} (${(blob.size / 1024).toFixed(0)} KB)`, 'status-ok');
+  } catch (e) {
+    setStatus(`Save error: ${e.message}`, 'status-err');
+    console.warn('saveProcessed error:', e);
+  }
 }
 
 function advance() {
