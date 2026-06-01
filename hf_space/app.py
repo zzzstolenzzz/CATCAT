@@ -431,7 +431,7 @@ def _run_training(dataset_repo, model_repo, base_weights_repo, progress_dict):
         image_stats = []
         try:
             preds = YOLO(str(trained_pt)).predict(
-                source=str(img_dir), imgsz=640, conf=0.25, verbose=False, save=False
+                source=str(img_dir), imgsz=640, conf=0.1, verbose=False, save=False
             )
             for r in preds:
                 confs = r.boxes.conf.tolist() if r.boxes is not None and len(r.boxes) > 0 else []

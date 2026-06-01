@@ -181,7 +181,7 @@ header {
 .chart-empty.hidden { display: none; }
 
 /* ── Runs table ──────────────────────────────────────────────── */
-.runs-wrap { position: relative; min-height: 120px; overflow-y: auto; max-height: 220px; }
+.runs-wrap { position: relative; min-height: 120px; }
 .runs-table { width: 100%; border-collapse: collapse; font-size: 0.82rem; }
 .runs-table th {
   text-align: left; padding: 6px 10px;
