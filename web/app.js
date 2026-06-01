@@ -397,7 +397,7 @@ async function loadCurrentImage() {
   computeLayout();
   render();
 
-  counterEl.textContent = `Image ${currentIndex + 1} of ${images.length}`;
+  counterEl.textContent = `${currentIndex + 1} / ${images.length}`;
   acceptBtn.disabled = false;
   clearBtn.disabled = false;
   skipBtn.disabled = false;
