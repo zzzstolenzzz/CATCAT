@@ -228,10 +228,17 @@ async function fetchHistory() {
         ? (h.total_seconds >= 60 ? `${Math.floor(h.total_seconds/60)}m ${h.total_seconds%60}s` : `${h.total_seconds}s`)
         : '—';
       const epochTime = h.avg_epoch_s != null ? `${h.avg_epoch_s}s` : '—';
+      const shipCount = h.images?.length;
+      const shipTime = (h.total_seconds != null && shipCount)
+        ? `${Math.round(h.total_seconds / shipCount)}s` : '—';
+
+      const origIdx = history.length - 1 - i;
+      const prevCount = origIdx > 0 ? (history[origIdx - 1].annotation_count ?? 0) : 0;
+      const runCount = h.annotation_count != null ? h.annotation_count - prevCount : '—';
 
       const tr = document.createElement('tr');
       tr.className = hasImages ? 'run-row expandable' : 'run-row';
-      tr.innerHTML = `<td>${hasImages ? '<span class="expand-arrow">▶</span>' : ''}#${run}</td><td>${date}</td><td>${time}</td><td>${map}</td><td>${h.annotation_count ?? '—'}</td><td>${totalTime}</td><td>${epochTime}</td>`;
+      tr.innerHTML = `<td>${hasImages ? '<span class="expand-arrow">▶</span>' : ''}#${run}</td><td>${date}</td><td>${time}</td><td>${map}</td><td>${runCount}</td><td>${totalTime}</td><td>${epochTime}</td><td>${shipTime}</td>`;
       tbody.appendChild(tr);
 
       if (hasImages) {
@@ -245,7 +252,7 @@ async function fetchHistory() {
               : '<span style="color:#00e87a">Model ✓</span>';
           return `<tr><td>${img.name}</td><td>${img.detections}</td><td>${img.max_conf > 0 ? (img.max_conf * 100).toFixed(1) + '%' : '—'}</td><td>${img.avg_conf > 0 ? (img.avg_conf * 100).toFixed(1) + '%' : '—'}</td><td>${labelCell}</td></tr>`;
         }).join('');
-        detail.innerHTML = `<td colspan="7"><div class="run-detail-inner"><table class="img-table"><thead><tr><th>Image</th><th>Detections<span class="tip" data-tip="Number of ships the model found in this image.">?</span></th><th>Max Conf<span class="tip" data-tip="Highest confidence score among all detections. 100% = the model is certain it's a ship.">?</span></th><th>Avg Conf<span class="tip" data-tip="Average confidence across all detections in this image.">?</span></th><th>Label<span class="tip" data-tip="Whether the user accepted the model's detection (Model ✓) or drew/corrected their own boxes (Corrected).">?</span></th></tr></thead><tbody>${imgRows}</tbody></table></div></td>`;
+        detail.innerHTML = `<td colspan="8"><div class="run-detail-inner"><table class="img-table"><thead><tr><th>Image</th><th>Detections<span class="tip" data-tip="Number of ships the model found in this image.">?</span></th><th>Max Conf<span class="tip" data-tip="Highest confidence score among all detections. 100% = the model is certain it's a ship.">?</span></th><th>Avg Conf<span class="tip" data-tip="Average confidence across all detections in this image.">?</span></th><th>Label<span class="tip" data-tip="Whether the user accepted the model's detection (Model ✓) or drew/corrected their own boxes (Corrected).">?</span></th></tr></thead><tbody>${imgRows}</tbody></table></div></td>`;
         tbody.appendChild(detail);
 
         tr.addEventListener('click', () => {
