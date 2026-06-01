@@ -213,14 +213,21 @@ function render(preview = null) {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
 
   const drawBox = (b, color) => {
+    const bx = canvasOffsetX + b.x1 * imgDisplayW;
+    const by = canvasOffsetY + b.y1 * imgDisplayH;
+    const bw = (b.x2 - b.x1) * imgDisplayW;
+    const bh = (b.y2 - b.y1) * imgDisplayH;
     ctx.strokeStyle = color;
     ctx.lineWidth = 2;
-    ctx.strokeRect(
-      canvasOffsetX + b.x1 * imgDisplayW,
-      canvasOffsetY + b.y1 * imgDisplayH,
-      (b.x2 - b.x1) * imgDisplayW,
-      (b.y2 - b.y1) * imgDisplayH,
-    );
+    ctx.setLineDash([]);
+    ctx.strokeRect(bx, by, bw, bh);
+
+    const pad = 2 * 96; // 2 inches at 96 CSS px/inch
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 1.5;
+    ctx.setLineDash([6, 4]);
+    ctx.strokeRect(bx - pad, by - pad, bw + pad * 2, bh + pad * 2);
+    ctx.setLineDash([]);
   };
 
   detectionBoxes.forEach(b => drawBox(b, '#00e676'));
