@@ -231,7 +231,7 @@ function render(preview = null) {
     ctx.strokeRect(bx, by, bw, bh);
 
     // Dotted expansion box, clamped to image bounds
-    const pad = 2 * 96; // 2 inches at 96 CSS px/inch
+    const pad = 96; // 1 inch at 96 CSS px/inch
     const dx1 = Math.max(imgLeft,   bx - pad);
     const dy1 = Math.max(imgTop,    by - pad);
     const dx2 = Math.min(imgRight,  bx + bw + pad);
