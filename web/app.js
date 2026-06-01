@@ -18,6 +18,8 @@ let mousePos = null;
 let canvasOffsetX = 0, canvasOffsetY = 0;
 let imgDisplayW = 0, imgDisplayH = 0;
 
+const RULER_SZ = 28; // px reserved for rulers on top and left
+
 // --- DOM refs ---
 const imageCanvas = document.getElementById('image-canvas');
 const imageCtx = imageCanvas.getContext('2d');
@@ -197,11 +199,12 @@ function computeLayout() {
   const container = canvas.parentElement;
   const cw = container.clientWidth, ch = container.clientHeight;
   const iw = currentImageEl.naturalWidth, ih = currentImageEl.naturalHeight;
-  const scale = Math.min(cw / iw, ch / ih);
+  const availW = cw - RULER_SZ, availH = ch - RULER_SZ;
+  const scale = Math.min(availW / iw, availH / ih);
   imgDisplayW = iw * scale;
   imgDisplayH = ih * scale;
-  canvasOffsetX = (cw - imgDisplayW) / 2;
-  canvasOffsetY = (ch - imgDisplayH) / 2;
+  canvasOffsetX = RULER_SZ + (availW - imgDisplayW) / 2;
+  canvasOffsetY = RULER_SZ + (availH - imgDisplayH) / 2;
   canvas.width = cw; canvas.height = ch;
   imageCanvas.width = cw; imageCanvas.height = ch;
 }
@@ -264,49 +267,46 @@ function render(preview = null) {
 }
 
 function drawRulers(imgLeft, imgTop, imgW, imgH) {
-  const INCH = 96;  // CSS px per inch at standard 96 dpi
-  const SZ   = 24;  // ruler strip thickness in px
+  const INCH = 96;
+  const SZ   = RULER_SZ;
 
   ctx.save();
 
-  // Background strips
-  ctx.fillStyle = 'rgba(0,0,0,0.55)';
-  ctx.fillRect(imgLeft, imgTop, imgW, SZ);       // top
-  ctx.fillRect(imgLeft, imgTop, SZ, imgH);       // left
+  // Backgrounds outside the image
+  ctx.fillStyle = 'rgba(15,18,28,0.92)';
+  ctx.fillRect(imgLeft - SZ, imgTop - SZ, imgW + SZ, SZ); // top strip + corner
+  ctx.fillRect(imgLeft - SZ, imgTop,      SZ,         imgH); // left strip
 
-  ctx.strokeStyle = 'rgba(255,255,255,0.75)';
-  ctx.fillStyle   = 'rgba(255,255,255,0.85)';
+  ctx.strokeStyle = 'rgba(255,255,255,0.7)';
+  ctx.fillStyle   = 'rgba(255,255,255,0.8)';
   ctx.lineWidth   = 1;
+  ctx.font        = '9px monospace';
 
-  // Top ruler — baseline along bottom edge of strip
-  const topBase = imgTop + SZ;
-  ctx.font = '9px monospace';
+  // Top ruler — ticks rise from the image edge upward
   ctx.textBaseline = 'top';
   for (let px = 0; px <= imgW; px += INCH / 2) {
     const isMajor = px % INCH === 0;
     const x = imgLeft + px;
-    const tickH = isMajor ? SZ - 2 : (SZ - 2) * 0.45;
+    const tickH = isMajor ? SZ - 5 : (SZ - 5) * 0.45;
     ctx.beginPath();
-    ctx.moveTo(x + 0.5, topBase);
-    ctx.lineTo(x + 0.5, topBase - tickH);
+    ctx.moveTo(x + 0.5, imgTop);
+    ctx.lineTo(x + 0.5, imgTop - tickH);
     ctx.stroke();
-    if (isMajor && px > 0) ctx.fillText(`${px / INCH}"`, x + 2, imgTop + 2);
+    if (isMajor && px > 0) ctx.fillText(`${px / INCH}"`, x + 2, imgTop - SZ + 2);
   }
 
-  // Left ruler — baseline along right edge of strip
-  const leftBase = imgLeft + SZ;
-  ctx.textBaseline = 'middle';
+  // Left ruler — ticks extend left from the image edge
   for (let py = INCH; py <= imgH; py += INCH / 2) {
     const isMajor = py % INCH === 0;
     const y = imgTop + py;
-    const tickW = isMajor ? SZ - 2 : (SZ - 2) * 0.45;
+    const tickW = isMajor ? SZ - 5 : (SZ - 5) * 0.45;
     ctx.beginPath();
-    ctx.moveTo(leftBase, y + 0.5);
-    ctx.lineTo(leftBase - tickW, y + 0.5);
+    ctx.moveTo(imgLeft,        y + 0.5);
+    ctx.lineTo(imgLeft - tickW, y + 0.5);
     ctx.stroke();
     if (isMajor) {
       ctx.save();
-      ctx.translate(imgLeft + 2, y);
+      ctx.translate(imgLeft - SZ + 2, y);
       ctx.rotate(-Math.PI / 2);
       const label = `${py / INCH}"`;
       ctx.fillText(label, -ctx.measureText(label).width / 2, 0);
