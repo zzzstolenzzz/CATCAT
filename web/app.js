@@ -118,27 +118,7 @@ function reprocessImage() {
   if (!currentImageEl) return;
   _autoContrast = document.getElementById('auto-contrast')?.checked ?? false;
   _autoColor    = document.getElementById('auto-color')?.checked ?? false;
-  console.log('[reprocess] contrast:', _autoContrast, 'color:', _autoColor, 'img:', currentImageEl.naturalWidth + 'x' + currentImageEl.naturalHeight);
-  _processedCanvas = null;
-  if (_autoContrast || _autoColor) {
-    try {
-      const w = currentImageEl.naturalWidth, h = currentImageEl.naturalHeight;
-      const pc = document.createElement('canvas');
-      pc.width = w; pc.height = h;
-      const pctx = pc.getContext('2d', { willReadFrequently: true });
-      pctx.drawImage(currentImageEl, 0, 0);
-      const sample = pctx.getImageData(0, 0, Math.min(w, 4), Math.min(h, 4));
-      console.log('[reprocess] first pixels:', Array.from(sample.data.slice(0, 12)));
-      let imgData = pctx.getImageData(0, 0, w, h);
-      if (_autoContrast) imgData = applyAutoContrast(imgData);
-      if (_autoColor)    imgData = applyAutoColor(imgData);
-      pctx.putImageData(imgData, 0, 0);
-      _processedCanvas = pc;
-      console.log('[reprocess] _processedCanvas SET');
-    } catch (e) {
-      console.warn('[reprocess] FAILED:', e);
-    }
-  }
+  _processedCanvas = null; // reset; rebuilt only for saves
   render();
 }
 
@@ -291,7 +271,17 @@ function computeLayout() {
 function render(preview = null) {
   if (!currentImageEl) return;
   imageCtx.clearRect(0, 0, imageCanvas.width, imageCanvas.height);
-  imageCtx.drawImage(_processedCanvas || currentImageEl, canvasOffsetX, canvasOffsetY, imgDisplayW, imgDisplayH);
+  imageCtx.drawImage(currentImageEl, canvasOffsetX, canvasOffsetY, imgDisplayW, imgDisplayH);
+  if (_autoContrast || _autoColor) {
+    const ix = Math.round(canvasOffsetX), iy = Math.round(canvasOffsetY);
+    const iw = Math.round(imgDisplayW),   ih = Math.round(imgDisplayH);
+    try {
+      let id = imageCtx.getImageData(ix, iy, iw, ih);
+      if (_autoContrast) id = applyAutoContrast(id);
+      if (_autoColor)    id = applyAutoColor(id);
+      imageCtx.putImageData(id, ix, iy);
+    } catch(e) { console.warn('render correction failed:', e); }
+  }
   ctx.clearRect(0, 0, canvas.width, canvas.height);
 
   const imgLeft   = canvasOffsetX;
@@ -496,8 +486,6 @@ async function loadCurrentImage() {
   await new Promise(res => { el.onload = res; });
   URL.revokeObjectURL(url);
   currentImageEl = el;
-  _processedCanvas = null;
-
   computeLayout();
   reprocessImage();
 
