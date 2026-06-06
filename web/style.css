@@ -249,6 +249,8 @@ button:disabled { opacity: 0.35; cursor: default; }
   padding: 5px 14px;
   font-size: 0.78rem;
   color: var(--text-dim);
+  display: flex;
+  align-items: center;
 }
 #status-text.status-ok   { color: #00e87a; font-weight: 600; }
 #status-text.status-err  { color: #ff4444; font-weight: 600; }
