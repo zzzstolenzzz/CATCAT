@@ -197,6 +197,15 @@ button:disabled { opacity: 0.35; cursor: default; }
   cursor: pointer;
 }
 
+.auto-toggle {
+  cursor: pointer;
+  user-select: none;
+}
+.auto-toggle input[type=checkbox] {
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+
 /* ── Canvas ── */
 #canvas-container {
   flex: 1;
