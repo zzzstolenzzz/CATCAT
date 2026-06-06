@@ -483,7 +483,23 @@ async function accept() {
 }
 
 async function saveProcessed(boxes) {
-  if (!_dirHandle) return; // no folder access — loaded via file picker fallback
+  // If no dir handle yet, try to acquire one; fall back to browser download
+  if (!_dirHandle) {
+    if (window.showDirectoryPicker) {
+      try {
+        setStatus('Choose a folder to save processed images…');
+        _dirHandle = await window.showDirectoryPicker({ mode: 'readwrite' });
+      } catch (e) {
+        if (e.name === 'AbortError') { setStatus('Save cancelled'); return; }
+        setStatus(`Folder error: ${e.message}`, 'status-err');
+        return;
+      }
+    } else {
+      // Browser doesn't support File System Access API — download directly
+      await downloadProcessed(boxes);
+      return;
+    }
+  }
 
   // Compute crop: union of all box bounds + 1-inch pad, clamped to image
   const padNX = 96 / imgDisplayW;
@@ -529,6 +545,42 @@ async function saveProcessed(boxes) {
     setStatus(`Save error: ${e.message}`, 'status-err');
     console.warn('saveProcessed error:', e);
   }
+}
+
+async function downloadProcessed(boxes) {
+  // Fallback: trigger browser download when File System Access API is unavailable
+  const padNX = 96 / imgDisplayW;
+  const padNY = 96 / imgDisplayH;
+  let x1 = 1, y1 = 1, x2 = 0, y2 = 0;
+  for (const b of boxes) {
+    x1 = Math.min(x1, b.x1); y1 = Math.min(y1, b.y1);
+    x2 = Math.max(x2, b.x2); y2 = Math.max(y2, b.y2);
+  }
+  const nx1 = Math.max(0, x1 - padNX), ny1 = Math.max(0, y1 - padNY);
+  const nx2 = Math.min(1, x2 + padNX), ny2 = Math.min(1, y2 + padNY);
+  const srcX = Math.round(nx1 * currentImageEl.naturalWidth);
+  const srcY = Math.round(ny1 * currentImageEl.naturalHeight);
+  const srcW = Math.round((nx2 - nx1) * currentImageEl.naturalWidth);
+  const srcH = Math.round((ny2 - ny1) * currentImageEl.naturalHeight);
+  const off = document.createElement('canvas');
+  off.width = srcW; off.height = srcH;
+  off.getContext('2d').drawImage(currentImageEl, srcX, srcY, srcW, srcH, 0, 0, srcW, srcH);
+  const MAX = 2.5 * 1024 * 1024;
+  let quality = 0.92, blob;
+  do {
+    blob = await new Promise(r => off.toBlob(r, 'image/jpeg', quality));
+    quality = Math.max(0.1, quality - 0.1);
+  } while (blob.size > MAX && quality > 0.1);
+  const imgName = images[currentIndex].name;
+  const dot = imgName.lastIndexOf('.');
+  const base = dot > 0 ? imgName.slice(0, dot) : imgName;
+  const outName = base + '_processed.jpg';
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = outName;
+  a.click();
+  URL.revokeObjectURL(a.href);
+  setStatus(`Downloaded ${outName} (${(blob.size / 1024).toFixed(0)} KB)`, 'status-ok');
 }
 
 function advance() {
