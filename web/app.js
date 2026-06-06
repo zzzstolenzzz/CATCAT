@@ -118,7 +118,23 @@ function reprocessImage() {
   if (!currentImageEl) return;
   _autoContrast = document.getElementById('auto-contrast')?.checked ?? false;
   _autoColor    = document.getElementById('auto-color')?.checked ?? false;
-  _processedCanvas = null; // reset; rebuilt only for saves
+  _processedCanvas = null;
+  if (_autoContrast || _autoColor) {
+    const w = Math.round(imgDisplayW), h = Math.round(imgDisplayH);
+    if (w > 0 && h > 0) {
+      try {
+        const pc = document.createElement('canvas');
+        pc.width = w; pc.height = h;
+        const pctx = pc.getContext('2d', { willReadFrequently: true });
+        pctx.drawImage(currentImageEl, 0, 0, w, h);
+        let id = pctx.getImageData(0, 0, w, h);
+        if (_autoContrast) id = applyAutoContrast(id);
+        if (_autoColor)    id = applyAutoColor(id);
+        pctx.putImageData(id, 0, 0);
+        _processedCanvas = pc;
+      } catch(e) { console.warn('reprocessImage failed:', e); }
+    }
+  }
   render();
 }
 
@@ -271,16 +287,10 @@ function computeLayout() {
 function render(preview = null) {
   if (!currentImageEl) return;
   imageCtx.clearRect(0, 0, imageCanvas.width, imageCanvas.height);
-  imageCtx.drawImage(currentImageEl, canvasOffsetX, canvasOffsetY, imgDisplayW, imgDisplayH);
-  if (_autoContrast || _autoColor) {
-    const ix = Math.round(canvasOffsetX), iy = Math.round(canvasOffsetY);
-    const iw = Math.round(imgDisplayW),   ih = Math.round(imgDisplayH);
-    try {
-      let id = imageCtx.getImageData(ix, iy, iw, ih);
-      if (_autoContrast) id = applyAutoContrast(id);
-      if (_autoColor)    id = applyAutoColor(id);
-      imageCtx.putImageData(id, ix, iy);
-    } catch(e) { console.warn('render correction failed:', e); }
+  if (_processedCanvas) {
+    imageCtx.drawImage(_processedCanvas, canvasOffsetX, canvasOffsetY, imgDisplayW, imgDisplayH);
+  } else {
+    imageCtx.drawImage(currentImageEl, canvasOffsetX, canvasOffsetY, imgDisplayW, imgDisplayH);
   }
   ctx.clearRect(0, 0, canvas.width, canvas.height);
 
@@ -585,11 +595,19 @@ async function saveProcessed(boxes) {
 
   const off = document.createElement('canvas');
   off.width = srcW; off.height = srcH;
-  const offCtx = off.getContext('2d');
-  const b = brightnessSlider.value / 100, c = contrastSlider.value / 100;
-  offCtx.filter = `brightness(${b}) contrast(${c})`;
-  offCtx.drawImage(_processedCanvas || currentImageEl, srcX, srcY, srcW, srcH, 0, 0, srcW, srcH);
+  const offCtx = off.getContext('2d', { willReadFrequently: true });
+  const bv = brightnessSlider.value / 100, cv = contrastSlider.value / 100;
+  offCtx.filter = `brightness(${bv}) contrast(${cv})`;
+  offCtx.drawImage(currentImageEl, srcX, srcY, srcW, srcH, 0, 0, srcW, srcH);
   offCtx.filter = 'none';
+  if (_autoContrast || _autoColor) {
+    try {
+      let id = offCtx.getImageData(0, 0, srcW, srcH);
+      if (_autoContrast) id = applyAutoContrast(id);
+      if (_autoColor)    id = applyAutoColor(id);
+      offCtx.putImageData(id, 0, 0);
+    } catch(e) {}
+  }
 
   // Encode JPEG, stepping quality down until under 2.5 MB
   const MAX = 2.5 * 1024 * 1024;
@@ -634,11 +652,19 @@ async function downloadProcessed(boxes) {
   const srcH = Math.round((ny2 - ny1) * currentImageEl.naturalHeight);
   const off = document.createElement('canvas');
   off.width = srcW; off.height = srcH;
-  const offCtx2 = off.getContext('2d');
+  const offCtx2 = off.getContext('2d', { willReadFrequently: true });
   const b2 = brightnessSlider.value / 100, c2 = contrastSlider.value / 100;
   offCtx2.filter = `brightness(${b2}) contrast(${c2})`;
-  offCtx2.drawImage(_processedCanvas || currentImageEl, srcX, srcY, srcW, srcH, 0, 0, srcW, srcH);
+  offCtx2.drawImage(currentImageEl, srcX, srcY, srcW, srcH, 0, 0, srcW, srcH);
   offCtx2.filter = 'none';
+  if (_autoContrast || _autoColor) {
+    try {
+      let id = offCtx2.getImageData(0, 0, srcW, srcH);
+      if (_autoContrast) id = applyAutoContrast(id);
+      if (_autoColor)    id = applyAutoColor(id);
+      offCtx2.putImageData(id, 0, 0);
+    } catch(e) {}
+  }
   const MAX = 2.5 * 1024 * 1024;
   let quality = 0.92, blob;
   do {
