@@ -419,11 +419,10 @@ def _run_training(dataset_repo, model_repo, base_weights_repo, progress_dict):
                 try: map50 = float(rows[-1]["metrics/mAP50(B)"])
                 except Exception: pass
 
-        # Load correction flags
+        # Load correction flags (already in tmpdir from snapshot_download)
         corrections = {}
         try:
-            p = hf_hub_download(dataset_repo, "corrections.json", repo_type="dataset", token=HF_TOKEN)
-            corrections = json.loads(Path(p).read_text())
+            corrections = json.loads((tmpdir / "corrections.json").read_text())
         except Exception:
             pass
 
