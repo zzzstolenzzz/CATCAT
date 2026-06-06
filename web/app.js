@@ -68,11 +68,11 @@ document.getElementById('reset-enhance').addEventListener('click', () => {
   applyEnhance();
 });
 
-document.getElementById('auto-contrast').addEventListener('change', e => {
+document.getElementById('auto-contrast')?.addEventListener('change', e => {
   _autoContrast = e.target.checked;
   reprocessImage();
 });
-document.getElementById('auto-color').addEventListener('change', e => {
+document.getElementById('auto-color')?.addEventListener('change', e => {
   _autoColor = e.target.checked;
   reprocessImage();
 });
@@ -117,8 +117,8 @@ function applyAutoColor(imageData) {
 function reprocessImage() {
   if (!currentImageEl) return;
   // Read state directly from DOM — never stale
-  _autoContrast = document.getElementById('auto-contrast').checked;
-  _autoColor    = document.getElementById('auto-color').checked;
+  _autoContrast = document.getElementById('auto-contrast')?.checked ?? false;
+  _autoColor    = document.getElementById('auto-color')?.checked ?? false;
   _processedCanvas = null;
   if (_autoContrast || _autoColor) {
     try {
