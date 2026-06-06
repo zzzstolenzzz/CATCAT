@@ -116,9 +116,9 @@ function applyAutoColor(imageData) {
 
 function reprocessImage() {
   if (!currentImageEl) return;
-  // Read state directly from DOM — never stale
   _autoContrast = document.getElementById('auto-contrast')?.checked ?? false;
   _autoColor    = document.getElementById('auto-color')?.checked ?? false;
+  console.log('[reprocess] contrast:', _autoContrast, 'color:', _autoColor, 'img:', currentImageEl.naturalWidth + 'x' + currentImageEl.naturalHeight);
   _processedCanvas = null;
   if (_autoContrast || _autoColor) {
     try {
@@ -127,13 +127,16 @@ function reprocessImage() {
       pc.width = w; pc.height = h;
       const pctx = pc.getContext('2d', { willReadFrequently: true });
       pctx.drawImage(currentImageEl, 0, 0);
+      const sample = pctx.getImageData(0, 0, Math.min(w, 4), Math.min(h, 4));
+      console.log('[reprocess] first pixels:', Array.from(sample.data.slice(0, 12)));
       let imgData = pctx.getImageData(0, 0, w, h);
       if (_autoContrast) imgData = applyAutoContrast(imgData);
       if (_autoColor)    imgData = applyAutoColor(imgData);
       pctx.putImageData(imgData, 0, 0);
       _processedCanvas = pc;
+      console.log('[reprocess] _processedCanvas SET');
     } catch (e) {
-      console.warn('reprocessImage failed:', e);
+      console.warn('[reprocess] FAILED:', e);
     }
   }
   render();
