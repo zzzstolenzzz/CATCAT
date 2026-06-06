@@ -116,18 +116,25 @@ function applyAutoColor(imageData) {
 
 function reprocessImage() {
   if (!currentImageEl) return;
+  // Read state directly from DOM — never stale
+  _autoContrast = document.getElementById('auto-contrast').checked;
+  _autoColor    = document.getElementById('auto-color').checked;
   _processedCanvas = null;
   if (_autoContrast || _autoColor) {
-    const w = currentImageEl.naturalWidth, h = currentImageEl.naturalHeight;
-    const pc = document.createElement('canvas');
-    pc.width = w; pc.height = h;
-    const pctx = pc.getContext('2d');
-    pctx.drawImage(currentImageEl, 0, 0);
-    let imgData = pctx.getImageData(0, 0, w, h);
-    if (_autoContrast) imgData = applyAutoContrast(imgData);
-    if (_autoColor)    imgData = applyAutoColor(imgData);
-    pctx.putImageData(imgData, 0, 0);
-    _processedCanvas = pc;
+    try {
+      const w = currentImageEl.naturalWidth, h = currentImageEl.naturalHeight;
+      const pc = document.createElement('canvas');
+      pc.width = w; pc.height = h;
+      const pctx = pc.getContext('2d', { willReadFrequently: true });
+      pctx.drawImage(currentImageEl, 0, 0);
+      let imgData = pctx.getImageData(0, 0, w, h);
+      if (_autoContrast) imgData = applyAutoContrast(imgData);
+      if (_autoColor)    imgData = applyAutoColor(imgData);
+      pctx.putImageData(imgData, 0, 0);
+      _processedCanvas = pc;
+    } catch (e) {
+      console.warn('reprocessImage failed:', e);
+    }
   }
   render();
 }
