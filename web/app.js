@@ -83,7 +83,7 @@ function applyAutoContrast(imageData) {
   for (let i = 0; i < n; i++)
     lums[i] = d[i*4]*0.299 + d[i*4+1]*0.587 + d[i*4+2]*0.114;
   lums.sort();
-  const clip = Math.max(1, Math.floor(n * 0.001));
+  const clip = Math.max(1, Math.floor(n * 0.02)); // 2% clip — aggressive enough for wide-range satellite images
   const lo = lums[clip], hi = lums[n - 1 - clip];
   if (hi <= lo) return imageData;
   const scale = 255 / (hi - lo);
