@@ -19,6 +19,9 @@ let canvasOffsetX = 0, canvasOffsetY = 0;
 let imgDisplayW = 0, imgDisplayH = 0;
 
 let _dirHandle = null; // FileSystemDirectoryHandle for local saves
+let _autoContrast = false;
+let _autoColor = false;
+let _processedCanvas = null; // offscreen canvas with auto corrections baked in
 
 const RULER_SZ = 28; // px reserved for rulers on top and left
 
@@ -64,6 +67,70 @@ document.getElementById('reset-enhance').addEventListener('click', () => {
   sharpenSlider.value = 0;
   applyEnhance();
 });
+
+document.getElementById('auto-contrast').addEventListener('change', e => {
+  _autoContrast = e.target.checked;
+  reprocessImage();
+});
+document.getElementById('auto-color').addEventListener('change', e => {
+  _autoColor = e.target.checked;
+  reprocessImage();
+});
+
+function applyAutoContrast(imageData) {
+  const d = imageData.data, n = d.length / 4;
+  const lums = new Float32Array(n);
+  for (let i = 0; i < n; i++)
+    lums[i] = d[i*4]*0.299 + d[i*4+1]*0.587 + d[i*4+2]*0.114;
+  lums.sort();
+  const clip = Math.max(1, Math.floor(n * 0.001));
+  const lo = lums[clip], hi = lums[n - 1 - clip];
+  if (hi <= lo) return imageData;
+  const scale = 255 / (hi - lo);
+  for (let i = 0; i < d.length; i += 4) {
+    d[i]   = Math.min(255, Math.max(0, (d[i]   - lo) * scale));
+    d[i+1] = Math.min(255, Math.max(0, (d[i+1] - lo) * scale));
+    d[i+2] = Math.min(255, Math.max(0, (d[i+2] - lo) * scale));
+  }
+  return imageData;
+}
+
+function applyAutoColor(imageData) {
+  const d = imageData.data, n = d.length / 4;
+  const rs = new Float32Array(n), gs = new Float32Array(n), bs = new Float32Array(n);
+  for (let i = 0; i < n; i++) {
+    rs[i] = d[i*4]; gs[i] = d[i*4+1]; bs[i] = d[i*4+2];
+  }
+  rs.sort(); gs.sort(); bs.sort();
+  const clip = Math.max(1, Math.floor(n * 0.005));
+  const rLo = rs[clip], rHi = rs[n-1-clip];
+  const gLo = gs[clip], gHi = gs[n-1-clip];
+  const bLo = bs[clip], bHi = bs[n-1-clip];
+  for (let i = 0; i < d.length; i += 4) {
+    d[i]   = rHi > rLo ? Math.min(255, Math.max(0, (d[i]   - rLo) * 255 / (rHi - rLo))) : d[i];
+    d[i+1] = gHi > gLo ? Math.min(255, Math.max(0, (d[i+1] - gLo) * 255 / (gHi - gLo))) : d[i+1];
+    d[i+2] = bHi > bLo ? Math.min(255, Math.max(0, (d[i+2] - bLo) * 255 / (bHi - bLo))) : d[i+2];
+  }
+  return imageData;
+}
+
+function reprocessImage() {
+  if (!currentImageEl) return;
+  _processedCanvas = null;
+  if (_autoContrast || _autoColor) {
+    const w = currentImageEl.naturalWidth, h = currentImageEl.naturalHeight;
+    const pc = document.createElement('canvas');
+    pc.width = w; pc.height = h;
+    const pctx = pc.getContext('2d');
+    pctx.drawImage(currentImageEl, 0, 0);
+    let imgData = pctx.getImageData(0, 0, w, h);
+    if (_autoContrast) imgData = applyAutoContrast(imgData);
+    if (_autoColor)    imgData = applyAutoColor(imgData);
+    pctx.putImageData(imgData, 0, 0);
+    _processedCanvas = pc;
+  }
+  render();
+}
 
 let _statusLocked = false;
 const setStatus = (msg, type) => {
@@ -214,7 +281,7 @@ function computeLayout() {
 function render(preview = null) {
   if (!currentImageEl) return;
   imageCtx.clearRect(0, 0, imageCanvas.width, imageCanvas.height);
-  imageCtx.drawImage(currentImageEl, canvasOffsetX, canvasOffsetY, imgDisplayW, imgDisplayH);
+  imageCtx.drawImage(_processedCanvas || currentImageEl, canvasOffsetX, canvasOffsetY, imgDisplayW, imgDisplayH);
   ctx.clearRect(0, 0, canvas.width, canvas.height);
 
   const imgLeft   = canvasOffsetX;
@@ -419,9 +486,10 @@ async function loadCurrentImage() {
   await new Promise(res => { el.onload = res; });
   URL.revokeObjectURL(url);
   currentImageEl = el;
+  _processedCanvas = null;
 
   computeLayout();
-  render();
+  reprocessImage();
 
   counterEl.textContent = `${currentIndex + 1} / ${images.length}`;
   acceptBtn.disabled = false;
@@ -519,7 +587,11 @@ async function saveProcessed(boxes) {
 
   const off = document.createElement('canvas');
   off.width = srcW; off.height = srcH;
-  off.getContext('2d').drawImage(currentImageEl, srcX, srcY, srcW, srcH, 0, 0, srcW, srcH);
+  const offCtx = off.getContext('2d');
+  const b = brightnessSlider.value / 100, c = contrastSlider.value / 100;
+  offCtx.filter = `brightness(${b}) contrast(${c})`;
+  offCtx.drawImage(_processedCanvas || currentImageEl, srcX, srcY, srcW, srcH, 0, 0, srcW, srcH);
+  offCtx.filter = 'none';
 
   // Encode JPEG, stepping quality down until under 2.5 MB
   const MAX = 2.5 * 1024 * 1024;
@@ -564,7 +636,11 @@ async function downloadProcessed(boxes) {
   const srcH = Math.round((ny2 - ny1) * currentImageEl.naturalHeight);
   const off = document.createElement('canvas');
   off.width = srcW; off.height = srcH;
-  off.getContext('2d').drawImage(currentImageEl, srcX, srcY, srcW, srcH, 0, 0, srcW, srcH);
+  const offCtx2 = off.getContext('2d');
+  const b2 = brightnessSlider.value / 100, c2 = contrastSlider.value / 100;
+  offCtx2.filter = `brightness(${b2}) contrast(${c2})`;
+  offCtx2.drawImage(_processedCanvas || currentImageEl, srcX, srcY, srcW, srcH, 0, 0, srcW, srcH);
+  offCtx2.filter = 'none';
   const MAX = 2.5 * 1024 * 1024;
   let quality = 0.92, blob;
   do {
