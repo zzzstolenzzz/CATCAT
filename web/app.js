@@ -473,6 +473,66 @@ loadBtn.addEventListener('click', async () => {
   }
 });
 
+document.getElementById('convert-zip-btn').addEventListener('click', async () => {
+  if (!window.showDirectoryPicker) {
+    setStatus('Folder picker not supported in this browser.', 'status-err');
+    return;
+  }
+  let dirHandle;
+  try {
+    dirHandle = await window.showDirectoryPicker({ mode: 'read' });
+  } catch (e) {
+    if (e.name !== 'AbortError') setStatus(`Folder error: ${e.message}`, 'status-err');
+    return;
+  }
+  const IMAGE_EXTS = new Set(['jpg', 'jpeg', 'png', 'bmp', 'tiff', 'tif', 'webp', 'gif']);
+  const entries = [];
+  for await (const [name, handle] of dirHandle.entries()) {
+    if (handle.kind === 'file' && IMAGE_EXTS.has(name.split('.').pop().toLowerCase())) {
+      entries.push({ name, handle });
+    }
+  }
+  if (!entries.length) {
+    setStatus('No image files found in that folder.', 'status-err');
+    return;
+  }
+  const zip = new JSZip();
+  const offscreen = document.createElement('canvas');
+  const octx = offscreen.getContext('2d');
+  for (let i = 0; i < entries.length; i++) {
+    const { name, handle } = entries[i];
+    setStatus(`Converting ${i + 1}/${entries.length}: ${name}…`);
+    const file = await handle.getFile();
+    const url = URL.createObjectURL(file);
+    await new Promise((resolve, reject) => {
+      const img = new Image();
+      img.onload = () => {
+        offscreen.width = img.naturalWidth;
+        offscreen.height = img.naturalHeight;
+        octx.drawImage(img, 0, 0);
+        URL.revokeObjectURL(url);
+        offscreen.toBlob(blob => {
+          blob.arrayBuffer().then(buf => {
+            const stem = name.lastIndexOf('.') > 0 ? name.slice(0, name.lastIndexOf('.')) : name;
+            zip.file(stem + '.jpg', buf);
+            resolve();
+          });
+        }, 'image/jpeg', 0.95);
+      };
+      img.onerror = () => { URL.revokeObjectURL(url); reject(new Error(`Failed to load ${name}`)); };
+      img.src = url;
+    });
+  }
+  setStatus('Creating ZIP…');
+  const blob = await zip.generateAsync({ type: 'blob' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = dirHandle.name + '_jpgs.zip';
+  a.click();
+  URL.revokeObjectURL(a.href);
+  setStatus(`Done. Downloaded ${entries.length} JPG(s) as ${dirHandle.name}_jpgs.zip`);
+});
+
 fileInput.addEventListener('change', async e => {
   const files = Array.from(e.target.files);
   if (!files.length) return;

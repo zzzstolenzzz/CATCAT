@@ -1,8 +1,10 @@
+import io
 import shutil
 import sys
 import threading
 import tkinter as tk
 import yaml
+import zipfile
 from pathlib import Path
 from tkinter import filedialog, messagebox, ttk
 
@@ -69,6 +71,7 @@ class App(tk.Tk):
         ttk.Button(toolbar, text="Load Images", command=self._load_images).pack(side=tk.LEFT, padx=2)
         ttk.Button(toolbar, text="Load Folder", command=self._load_folder).pack(side=tk.LEFT, padx=2)
         ttk.Button(toolbar, text="Import Existing Data", command=self._import_data).pack(side=tk.LEFT, padx=2)
+        ttk.Button(toolbar, text="Convert Folder to JPG Zip", command=self._convert_to_jpg_zip).pack(side=tk.LEFT, padx=2)
 
         self._counter_var = tk.StringVar()
         ttk.Label(toolbar, textvariable=self._counter_var).pack(side=tk.RIGHT, padx=10)
@@ -174,6 +177,39 @@ class App(tk.Tk):
                     shutil.copy(lbl, LABELS_DIR / lbl.name)
                 count += 1
         self._set_status(f"Imported {count} image(s) into training dataset.")
+
+    def _convert_to_jpg_zip(self):
+        folder = filedialog.askdirectory(title="Select folder of images to convert")
+        if not folder:
+            return
+        src = Path(folder)
+        paths = sorted(p for ext in IMAGE_EXTS for p in src.rglob(ext))
+        if not paths:
+            messagebox.showinfo("No images", "No supported image files found in that folder.")
+            return
+        out_path = filedialog.asksaveasfilename(
+            defaultextension=".zip",
+            filetypes=[("ZIP archive", "*.zip")],
+            initialfile=src.name + "_jpgs.zip",
+            title="Save ZIP as",
+        )
+        if not out_path:
+            return
+        self._set_status(f"Converting {len(paths)} image(s) to JPG…")
+        threading.Thread(target=self._do_convert, args=(paths, out_path), daemon=True).start()
+
+    def _do_convert(self, paths, out_path):
+        try:
+            with zipfile.ZipFile(out_path, "w", zipfile.ZIP_DEFLATED) as zf:
+                for i, p in enumerate(paths, 1):
+                    self._set_status(f"Converting {i}/{len(paths)}: {p.name}…")
+                    buf = io.BytesIO()
+                    Image.open(p).convert("RGB").save(buf, format="JPEG", quality=95)
+                    zf.writestr(p.stem + ".jpg", buf.getvalue())
+            self._set_status(f"Done. Saved {len(paths)} JPG(s) to {Path(out_path).name}")
+        except Exception as e:
+            self.after(0, lambda: messagebox.showerror("Conversion failed", str(e)))
+            self._set_status("Conversion failed.")
 
     # ── Display ────────────────────────────────────────────────────────────────
 
