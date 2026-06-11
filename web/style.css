@@ -253,6 +253,9 @@ button:disabled { opacity: 0.35; cursor: default; }
 }
 #accept-btn:hover:not(:disabled) { opacity: 0.85; }
 
+#convert-zip-btn { background: #e6c800; color: #000; margin-left: auto; }
+#convert-zip-btn:hover:not(:disabled) { background: #ffd700; }
+
 /* ── Status bar ── */
 #status-bar {
   padding: 5px 14px;
